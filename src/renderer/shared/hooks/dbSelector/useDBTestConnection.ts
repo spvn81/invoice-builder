@@ -6,16 +6,16 @@ import type { Response } from '../../types/response';
 import { useAsyncAction } from '../ayncAction/useAsyncAction';
 
 interface UseTestConnectionDBParams extends RequestHook<Response<unknown>> {
-  postgresConfig: PostgresConfig;
+  config: PostgresConfig & { dbType?: import('../../enums/databaseType').DatabaseType };
 }
 
 export const useTestConnection = ({
-  postgresConfig,
+  config,
   immediate = true,
   showLoader = true,
   onDone
 }: UseTestConnectionDBParams) => {
-  const asyncFn = useCallback(() => getApi().testConnection(postgresConfig), [postgresConfig]);
+  const asyncFn = useCallback(() => getApi().testConnection(config), [config]);
   const { data, execute } = useAsyncAction<Response<unknown>>(asyncFn, { showLoader, immediate, onDone });
 
   return { data, execute };

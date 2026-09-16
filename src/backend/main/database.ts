@@ -4,8 +4,10 @@ import { DatabaseType } from '../shared/enums/databaseType';
 import type { DatabaseAdapter } from '../shared/types/DatabaseAdapter';
 import type { PostgresConfig } from '../shared/types/postgresConfig';
 import type { SqLiteConfig } from '../shared/types/sqliteConfig';
+import type { MySqlConfig } from '../shared/types/mysqlConfig';
 import { initIpcHandler } from './ipc';
 import { runMigrations } from './migration';
+import { openMySql } from '../shared/db/setup';
 
 let dbInstance: DatabaseAdapter | null = null;
 
@@ -14,9 +16,10 @@ const setupDB = async (opts: {
   createIfMissing?: boolean;
   postgresConfig?: PostgresConfig;
   sqliteConfig?: SqLiteConfig;
+  mysqlConfig?: MySqlConfig;
   mainWindow: BrowserWindow;
 }) => {
-  const { sqliteConfig, createIfMissing = true, mainWindow, dbType, postgresConfig } = opts;
+  const { sqliteConfig, createIfMissing = true, mainWindow, dbType, postgresConfig, mysqlConfig } = opts;
 
   if (dbInstance) {
     await (dbInstance as DatabaseAdapter).close();
@@ -29,6 +32,10 @@ const setupDB = async (opts: {
     dbInstance = newDb;
   } else if (dbType === DatabaseType.sqlite) {
     const { db: newDb } = await openSqlLite({ fullPath: sqliteConfig?.fullPath, createIfMissing: createIfMissing });
+    dbInstance = newDb;
+  } else if (dbType === DatabaseType.mysql) {
+    if (!mysqlConfig) throw new Error('error.mysqlConfig');
+    const { db: newDb } = await openMySql(mysqlConfig);
     dbInstance = newDb;
   }
 

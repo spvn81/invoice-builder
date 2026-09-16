@@ -1,9 +1,10 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron';
 import { join } from 'path';
-import { testPostgresConnection } from '../../shared/db/setup';
+import { testPostgresConnection, testMySqlConnection } from '../../shared/db/setup';
 import { DatabaseType } from '../../shared/enums/databaseType';
 import { DBInitType } from '../../shared/enums/dbInitType';
 import type { PostgresConfig } from '../../shared/types/postgresConfig';
+import type { MySqlConfig } from '../../shared/types/mysqlConfig';
 import { mapDatabaseError } from '../../shared/utils/errorFunctions';
 import { setupDB } from '../database';
 
@@ -107,19 +108,23 @@ export const initDBDialogsHandlers = (dbName: string, mainWindow: BrowserWindow)
       }
     };
   });
-  ipcMain.handle('test-connection', async (_event, postgresConfig?: PostgresConfig) => {
+  ipcMain.handle('test-connection', async (_event, config?: PostgresConfig & { dbType?: DatabaseType }) => {
     try {
-      await testPostgresConnection(postgresConfig);
+      if (config?.dbType === DatabaseType.mysql) {
+        await testMySqlConnection(config);
+      } else {
+        await testPostgresConnection(config);
+      }
       return { success: true };
     } catch (error) {
-      return { success: false, ...mapDatabaseError(error, DatabaseType.postgre) };
+      return { success: false, ...mapDatabaseError(error, config?.dbType || DatabaseType.postgre) };
     }
   });
   ipcMain.handle(
     'initialize-db',
     async (
       _event,
-      opts: { fullPath?: string; dbType: DatabaseType; mode?: DBInitType; postgresConfig?: PostgresConfig }
+      opts: { fullPath?: string; dbType: DatabaseType; mode?: DBInitType; postgresConfig?: PostgresConfig; mysqlConfig?: MySqlConfig }
     ) => {
       try {
         resetIPCHandlers();
@@ -130,7 +135,8 @@ export const initDBDialogsHandlers = (dbName: string, mainWindow: BrowserWindow)
           dbType: opts.dbType,
           createIfMissing,
           mainWindow,
-          postgresConfig: opts.postgresConfig
+          postgresConfig: opts.postgresConfig,
+          mysqlConfig: opts.mysqlConfig
         });
         return { success: true };
       } catch (error) {

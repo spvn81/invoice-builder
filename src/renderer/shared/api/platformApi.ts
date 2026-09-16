@@ -23,6 +23,7 @@ import type {
 import type { Item, ItemAdd, ItemUpdate } from '../types/item';
 import type { Layout, LayoutAdd, LayoutUpdate } from '../types/layouts';
 import type { PostgresConfig } from '../types/postgresConfig';
+import type { MySqlConfig } from '../types/mysqlConfig';
 import type { PresetAdd, PresetUpdate, PresetUpdateWeb, PresetWeb } from '../types/preset';
 import type { Response } from '../types/response';
 import type { Settings, SettingsUpdate } from '../types/settings';
@@ -244,12 +245,13 @@ export const webApi = () => {
       Promise.resolve({ success: true, data: { canceled: true, filePath: '' } } as Response<DBSelector>),
     initializeDatabase: (data: {
       postgresConfig?: PostgresConfig;
+      mysqlConfig?: MySqlConfig;
       dbType: DatabaseType;
       fullPath?: string;
       mode?: DBInitType;
     }) => apiPost<{ success: boolean; message?: string }>('/api/databases', data),
     getDatabaseList: () => apiGet<Response<string[]>>('/api/databases'),
-    testConnection: (data: PostgresConfig) => apiPost<Response<unknown>>('/api/databases/test', data),
+    testConnection: (data: PostgresConfig & MySqlConfig & { dbType?: DatabaseType }) => apiPost<Response<unknown>>('/api/databases/test', data),
 
     getAllSettings: () => apiGet<Response<Settings>>('/api/settings'),
     updateSettings: (data: SettingsUpdate) => apiPut<Response<SettingsUpdate>>('/api/settings', data),

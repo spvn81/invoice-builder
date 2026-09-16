@@ -9,11 +9,11 @@ export const up = async (db: DatabaseAdapter) => {
     const colInfo = cols.find(c => c.name === 'fieldSortOrders');
     if (colInfo) return;
 
-    if (db.type === DatabaseType.sqlite) {
+    if (db.type === DatabaseType.sqlite || db.type === DatabaseType.mysql) {
       await db.run(`      
         UPDATE invoice_items
-        SET "customField" = json_set("customField", '$.sortOrder', 0)
-        WHERE json_extract("customField", '$.sortOrder') IS NULL;
+        SET "customField" = JSON_SET("customField", '$.sortOrder', 0)
+        WHERE JSON_EXTRACT("customField", '$.sortOrder') IS NULL;
       `);
     }
     if (db.type === DatabaseType.postgre) {

@@ -21,7 +21,7 @@ import type { PostgresConfig } from '../../shared/types/postgresConfig';
 import type { Response } from '../../shared/types/response';
 import { useAppDispatch } from '../../state/configureStore';
 import { addToast } from '../../state/pageSlice';
-import { ConnectionSetter } from './modals/ConnectionSetter';
+import { ConnectionSetter, type ServerConfig } from './modals/ConnectionSetter';
 import { PasswordSetter } from './modals/PasswordSetter';
 
 interface Props {
@@ -32,19 +32,20 @@ export const ServerDatabase: FC<Props> = ({ onDatabaseRead }) => {
   const theme = useTheme();
   const { t } = useTranslation();
 
-  const [connection, setConnection] = useState<PostgresConfig | undefined>(undefined);
+  const [connection, setConnection] = useState<ServerConfig | undefined>(undefined);
   const [isDBConnectionModalOpen, setIsDBConnectionModalOpen] = useState(false);
   const [isDBPasswordModalOpen, setIsDBPasswordModalOpen] = useState(false);
   const handleSetupConnection = async () => {
     setIsDBConnectionModalOpen(true);
   };
-  const [savedDbs, setSavedDbs] = useState<PostgresConfig[]>([]);
+  const [savedDbs, setSavedDbs] = useState<ServerConfig[]>([]);
   const [isInitializing, setIsInitializing] = useState(false);
 
   const { execute: initDB } = useDBInit({
     mode: DBInitType.create,
-    postgresConfig: connection,
-    dbType: DatabaseType.postgre,
+    postgresConfig: connection?.dbType === DatabaseType.postgre ? connection : undefined,
+    mysqlConfig: connection?.dbType === DatabaseType.mysql ? connection : undefined,
+    dbType: connection?.dbType || DatabaseType.postgre,
     immediate: false,
     onDone: (data: Response<unknown>) => {
       if (!data.success) {
@@ -59,11 +60,11 @@ export const ServerDatabase: FC<Props> = ({ onDatabaseRead }) => {
     }
   });
 
-  const isSameDb = (a: PostgresConfig, b: PostgresConfig) =>
-    a.host === b.host && a.port === b.port && a.database === b.database && a.user === b.user;
+  const isSameDb = (a: ServerConfig, b: ServerConfig) =>
+    a.host === b.host && a.port === b.port && a.database === b.database && a.user === b.user && a.dbType === b.dbType;
 
   const saveDbList = useCallback(
-    (list: PostgresConfig[]) => {
+    (list: ServerConfig[]) => {
       const uniqueList = list.filter((item, index, self) => index === self.findIndex(p => isSameDb(p, item)));
       const sortedList = [...uniqueList].sort((a, b) => a.database.localeCompare(b.database));
       setSavedDbs(sortedList);
@@ -76,15 +77,15 @@ export const ServerDatabase: FC<Props> = ({ onDatabaseRead }) => {
     [t, dispatch]
   );
 
-  const handleForget = (config: PostgresConfig) => {
+  const handleForget = (config: ServerConfig) => {
     const updated = savedDbs.filter(
-      p => p.host !== config.host || p.port !== config.port || p.database !== config.database || p.user !== config.user
+      p => p.host !== config.host || p.port !== config.port || p.database !== config.database || p.user !== config.user || p.dbType !== config.dbType
     );
     saveDbList(updated);
   };
 
   const handleOpenSaved = useCallback(
-    async (config: PostgresConfig) => {
+    async (config: ServerConfig) => {
       const { password, ...rest } = config;
       void password;
       const newList = Array.from(new Set([rest, ...savedDbs]));
@@ -96,8 +97,8 @@ export const ServerDatabase: FC<Props> = ({ onDatabaseRead }) => {
   );
 
   useEffect(() => {
-    if (connection?.password) handleOpenSaved(connection);
-    if (connection && !connection.password) setIsDBPasswordModalOpen(true);
+    if (connection && connection.password !== undefined) handleOpenSaved(connection);
+    if (connection && connection.password === undefined) setIsDBPasswordModalOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connection]);
 
@@ -105,7 +106,10 @@ export const ServerDatabase: FC<Props> = ({ onDatabaseRead }) => {
     try {
       const raw = localStorage.getItem('connetionData');
       if (raw) {
-        setSavedDbs(JSON.parse(raw) as PostgresConfig[]);
+        // Handle migration of old data missing dbType
+        const parsed = JSON.parse(raw) as ServerConfig[];
+        const migrated = parsed.map(db => ({ ...db, dbType: db.dbType || DatabaseType.postgre }));
+        setSavedDbs(migrated);
       }
 
       const lastUsedLanguage = localStorage.getItem('lastUsedLanguage');
@@ -131,7 +135,7 @@ export const ServerDatabase: FC<Props> = ({ onDatabaseRead }) => {
           <ConnectionSetter
             isOpen={isDBConnectionModalOpen}
             onCancel={() => setIsDBConnectionModalOpen(false)}
-            onSave={(connection: PostgresConfig) => {
+            onSave={(connection: ServerConfig) => {
               setConnection(connection);
               setIsDBConnectionModalOpen(false);
             }}
@@ -194,7 +198,8 @@ export const ServerDatabase: FC<Props> = ({ onDatabaseRead }) => {
           {savedDbs.map((item, index) => {
             const authPart = encodeURIComponent(item.user);
             const sslPart = item.ssl ? '?sslmode=require' : '';
-            const connectionString = `postgresql://${authPart}@${item.host}:${item.port}/${item.database}${sslPart}`;
+            const protocol = item.dbType === DatabaseType.mysql ? 'mysql://' : 'postgresql://';
+            const connectionString = `${protocol}${authPart}@${item.host}:${item.port}/${item.database}${sslPart}`;
 
             return (
               <Paper

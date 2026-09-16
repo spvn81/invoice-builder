@@ -101,6 +101,16 @@ export const getColumnType = (sqliteType: string, dbType: DatabaseType) => {
         return sqliteType;
     }
   }
+  if (dbType === DatabaseType.mysql) {
+    switch (sqliteType) {
+      case 'INTEGER PRIMARY KEY AUTOINCREMENT':
+        return 'INTEGER AUTO_INCREMENT PRIMARY KEY';
+      case 'BLOB':
+        return 'LONGBLOB';
+      default:
+        return sqliteType;
+    }
+  }
   return sqliteType;
 };
 
@@ -123,6 +133,24 @@ export const getDefaultValue = (sqliteExpr: string, dbType: DatabaseType) => {
         return sqliteExpr;
     }
   }
+  if (dbType === DatabaseType.mysql) {
+    switch (sqliteExpr) {
+      case "datetime('now', '-30 days')":
+        return "DATE_SUB(NOW(), INTERVAL 30 DAY)";
+      case "datetime('now', '-60 days')":
+        return "DATE_SUB(NOW(), INTERVAL 60 DAY)";
+      case "datetime('now', '-90 days')":
+        return "DATE_SUB(NOW(), INTERVAL 90 DAY)";
+      case "date('now','start of month','+2 months','-1 day')":
+        return "LAST_DAY(DATE_ADD(NOW(), INTERVAL 1 MONTH))";
+      case "(datetime('now'))":
+        return 'NOW()';
+      case "datetime('now')":
+        return 'NOW()';
+      default:
+        return sqliteExpr;
+    }
+  }
   return sqliteExpr;
 };
 
@@ -136,6 +164,8 @@ export const insertOrIgnore = (
   if (columns.length === 0) {
     if (dbType === DatabaseType.sqlite) {
       return `INSERT OR IGNORE INTO ${table} DEFAULT VALUES;`;
+    } else if (dbType === DatabaseType.mysql) {
+      return `INSERT IGNORE INTO \`${table}\` () VALUES ();`;
     } else {
       if (!conflictTarget) {
         throw new Error(`error.postgresConflictTarget`);
@@ -149,6 +179,9 @@ export const insertOrIgnore = (
 
   if (dbType === DatabaseType.sqlite) {
     return `INSERT OR IGNORE INTO ${table} (${columnsList}) VALUES ${valuesList};`;
+  } else if (dbType === DatabaseType.mysql) {
+    const columnsListMysql = columns.map(c => `\`${c}\``).join(', ');
+    return `INSERT IGNORE INTO \`${table}\` (${columnsListMysql}) VALUES ${valuesList};`;
   } else {
     if (!conflictTarget) {
       throw new Error(`error.postgresConflictTarget`);
@@ -182,6 +215,18 @@ export const isTableExists = async (db: DatabaseAdapter, tableName: string): Pro
     );
     return !!row;
   }
+  if (db.type === DatabaseType.mysql) {
+    const row = await db.get<{ TABLE_NAME: string }>(
+      `
+      SELECT TABLE_NAME
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+        AND table_name = ?
+      `,
+      [tableName]
+    );
+    return !!row;
+  }
 
   return false;
 };
@@ -196,7 +241,7 @@ export const getTableColumns = async (db: DatabaseAdapter, tableName: string): P
     );
     return rows;
   }
-  if (db.type === DatabaseType.postgre) {
+  if (db.type === DatabaseType.postgre || db.type === DatabaseType.mysql) {
     const rows = await db.all<TableColumn>(
       `SELECT column_name AS name, 
       data_type AS type

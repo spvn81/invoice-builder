@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import cors from 'cors';
 import express, { type Request, type Response } from 'express';
 import { APP_CONFIG } from './config';
@@ -23,6 +24,23 @@ app.set('trust proxy', 1);
 const main = async () => {
   initDatabaseController(app);
   initControllers(app);
+
+  if (process.env.DATABASE_TYPE === 'mysql') {
+    const { setupDB } = await import('./database');
+    const { DatabaseType } = await import('../shared/enums/databaseType');
+    await setupDB({
+      dbType: DatabaseType.mysql,
+      mysqlConfig: {
+        host: process.env.MYSQL_HOST || '127.0.0.1',
+        port: Number(process.env.MYSQL_PORT) || 3306,
+        user: process.env.MYSQL_USER || 'root',
+        password: process.env.MYSQL_PASSWORD || '',
+        database: process.env.MYSQL_DATABASE || 'invoice_builder',
+        ssl: process.env.MYSQL_SSL === 'true'
+      }
+    });
+    console.log('Connected to MySQL via environment variables.');
+  }
 
   app.listen(port, server, () => {
     console.log(`Server listening at http://${host}:${port}`);

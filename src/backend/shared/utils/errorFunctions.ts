@@ -22,6 +22,17 @@ const postgresErrorMap: Record<string, string> = {
   '22P02': 'error.datatypeMismatch'
 };
 
+const mysqlErrorMap: Record<string, string> = {
+  'ER_DUP_ENTRY': 'error.invalidConstraintUnique',
+  '1062': 'error.invalidConstraintUnique',
+  'ER_ROW_IS_REFERENCED_2': 'error.invalidConstraintForeign',
+  'ER_NO_REFERENCED_ROW_2': 'error.invalidConstraintForeign',
+  'ER_BAD_NULL_ERROR': 'error.invalidConstraintNotNull',
+  'ER_CHECK_CONSTRAINT_VIOLATED': 'error.invalidConstraintCheck',
+  'ER_PARSE_ERROR': 'error.sqlSyntaxError',
+  'ER_TRUNCATED_WRONG_VALUE': 'error.datatypeMismatch'
+};
+
 export const isDatabaseError = (error: unknown): error is DatabaseError => {
   return error instanceof Error && typeof (error as unknown as { code?: string }).code === 'string';
 };
@@ -38,6 +49,12 @@ export const mapDatabaseError = (error: unknown, dbType: DatabaseType): { key: s
 
     if (dbType === DatabaseType.postgre) {
       const mapped = postgresErrorMap[error.code];
+      if (mapped) return { key: mapped };
+    }
+
+    if (dbType === DatabaseType.mysql) {
+      const errCode = (error as any).code || String((error as any).errno);
+      const mapped = mysqlErrorMap[errCode];
       if (mapped) return { key: mapped };
     }
 

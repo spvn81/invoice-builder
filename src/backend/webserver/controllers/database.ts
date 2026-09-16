@@ -1,7 +1,7 @@
 import { type Express, type Request, type Response } from 'express';
 import fsPromise from 'fs/promises';
 import path from 'path';
-import { testPostgresConnection } from '../../shared/db/setup';
+import { testPostgresConnection, testMySqlConnection } from '../../shared/db/setup';
 import { DatabaseType } from '../../shared/enums/databaseType';
 import { DBInitType } from '../../shared/enums/dbInitType';
 import { APP_CONFIG } from '../config';
@@ -29,13 +29,16 @@ export const initDatabaseController = (app: Express) => {
   });
   app.post('/api/databases/test', async (req: Request, res: Response) => {
     try {
-      const postgresConfig = req.body;
+      const { dbType, ...config } = req.body;
 
-      if (postgresConfig.host === 'localhost') {
-        postgresConfig.host = 'host.docker.internal';
+      if (dbType === DatabaseType.mysql) {
+        await testMySqlConnection(config);
+      } else {
+        if (config.host === 'localhost') {
+          config.host = 'host.docker.internal';
+        }
+        await testPostgresConnection(config);
       }
-
-      await testPostgresConnection(postgresConfig);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ success: false, message: (err as Error).message });
@@ -47,18 +50,23 @@ export const initDatabaseController = (app: Express) => {
       const mode = String(req.body?.mode ?? '');
       const dbType = req.body?.dbType ?? DatabaseType.sqlite;
       const postgresConfig = req.body?.postgresConfig;
+      const mysqlConfig = req.body?.mysqlConfig;
       const fullPath = path.resolve(dbDir, name);
       const createIfMissing = mode === DBInitType.create || typeof mode === 'undefined';
 
       if (process.env.NODE_ENV === 'docker' && postgresConfig && postgresConfig.host === 'localhost') {
         postgresConfig.host = 'host.docker.internal';
       }
+      if (process.env.NODE_ENV === 'docker' && mysqlConfig && mysqlConfig.host === 'localhost') {
+        mysqlConfig.host = 'host.docker.internal';
+      }
 
       await setupDB({
         sqliteConfig: { fullPath: fullPath },
         dbType: dbType,
         createIfMissing,
-        postgresConfig: postgresConfig
+        postgresConfig: postgresConfig,
+        mysqlConfig: mysqlConfig
       });
       res.json({ success: true });
     } catch (err) {

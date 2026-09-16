@@ -280,6 +280,10 @@ export const importAllData = async (db: DatabaseAdapter, parsed: Record<string, 
               pg_get_serial_sequence('${table}', 'id'),
               (SELECT MAX(id) FROM ${table})
             );`);
+        } else if (db.type === DatabaseType.mysql) {
+          const res = await db.query(`SELECT MAX(id) AS maxId FROM \`${table}\``);
+          const maxId = res.rows[0] && (res.rows[0] as any).maxId ? Number((res.rows[0] as any).maxId) : 0;
+          await db.run(`ALTER TABLE \`${table}\` AUTO_INCREMENT = ${maxId + 1}`);
         }
       }
 

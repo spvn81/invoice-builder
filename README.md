@@ -7,7 +7,7 @@
 ![Linux](https://img.shields.io/badge/Linux-DEB%20%7C%20AppImage-blue?logo=linux)
 ![macOS](https://img.shields.io/badge/macOS-DMG-lightgrey?logo=apple&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-blue?style=flat-square&logo=docker&logoColor=white)
-[![GHCR](https://img.shields.io/badge/ghcr.io-invoice--builder-blue?style=flat-square&logo=github)](https://github.com/piratuks/invoice-builder/pkgs/container/invoice-builder)
+
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FF813F?style=flat&logo=buy-me-a-coffee&logoColor=white)](https://www.buymeacoffee.com/evaldizi)
 
 <a href="https://trendshift.io/repositories/17939?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-17939" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/17939" alt="piratuks%2Finvoice-builder | Trendshift" width="250" height="55"/></a>
@@ -159,17 +159,7 @@ This option is ideal if you want:
 
 ### Docker Image
 
-A pre-built image is published automatically to GitHub Container Registry on every push to `main` and on every version tag:
-
-```bash
-ghcr.io/piratuks/invoice-builder:latest
-```
-
-Pull it at any time with:
-
-```bash
-docker pull ghcr.io/piratuks/invoice-builder:latest
-```
+You can build and deploy it manually via Docker Compose.
 
 > **ℹ️ `VITE_API_URL` is no longer needed for Docker deployments.**
 > The Docker image now uses **nginx** as the frontend server. Nginx proxies all `/api/*` requests

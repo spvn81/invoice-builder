@@ -1,4 +1,5 @@
 export enum DatabaseType {
   sqlite = 'SQLite',
-  postgre = 'PostgreSQL'
+  postgre = 'PostgreSQL',
+  mysql = 'MySQL'
 }

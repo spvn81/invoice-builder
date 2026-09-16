@@ -44,7 +44,10 @@ export const runMigrations = async (db: DatabaseAdapter, migrationsPath: string)
           throw new Error(`error.noUpFunction`);
         }
         if (migration.up) {
-          await migration.up(db);
+          const result = await migration.up(db);
+          if (result && result.success === false) {
+            throw new Error(result.message || 'Migration failed');
+          }
           await db.run(`INSERT INTO migrations("name") VALUES(?)`, [name]);
         }
       }

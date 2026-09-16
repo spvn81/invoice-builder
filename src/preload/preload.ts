@@ -12,6 +12,8 @@ import type { InvoiceAdd, InvoiceUpdate } from '../renderer/shared/types/invoice
 import type { ItemAdd, ItemUpdate } from '../renderer/shared/types/item';
 import type { LayoutAdd, LayoutUpdate } from '../renderer/shared/types/layouts';
 import type { PostgresConfig } from '../renderer/shared/types/postgresConfig';
+import type { MySqlConfig } from '../renderer/shared/types/mysqlConfig';
+import type { DatabaseType } from '../renderer/shared/enums/databaseType';
 import type { Preset, PresetAdd, PresetUpdate } from '../renderer/shared/types/preset';
 import type { SettingsUpdate } from '../renderer/shared/types/settings';
 import type { StyleProfile, StyleProfileAdd, StyleProfileUpdate } from '../renderer/shared/types/styleProfiles';
@@ -46,10 +48,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('update-downloaded', listener);
   },
 
-  testConnection: (data: PostgresConfig) => ipcRenderer.invoke('test-connection', data),
+  testConnection: (data: PostgresConfig & { dbType?: DatabaseType }) => ipcRenderer.invoke('test-connection', data),
   selectDatabase: () => ipcRenderer.invoke('show-save-db-dialog'),
   openDatabase: () => ipcRenderer.invoke('show-open-db-dialog'),
-  initializeDatabase: (data: { fullPath: string; mode?: DBInitType }) => ipcRenderer.invoke('initialize-db', data),
+  initializeDatabase: (data: { fullPath?: string; mode?: DBInitType, dbType?: DatabaseType, postgresConfig?: PostgresConfig, mysqlConfig?: MySqlConfig }) => ipcRenderer.invoke('initialize-db', data),
   getDatabaseList: () => console.warn('Not supported for Electron API'),
 
   openUrl: (url: string) => ipcRenderer.invoke('open-url', url),

@@ -16,9 +16,7 @@ export const PasswordSetter: FC<Props> = ({ isOpen, onCancel = () => {}, onSave 
   const [passwordError, setPasswordErrors] = useState(false);
 
   useEffect(() => {
-    const valid = password.trim() !== '' && !passwordError;
-
-    setIsFormValid(valid);
+    setIsFormValid(!passwordError);
   }, [password, passwordError]);
 
   return (
@@ -35,7 +33,7 @@ export const PasswordSetter: FC<Props> = ({ isOpen, onCancel = () => {}, onSave 
       />
       <DialogContent sx={{ minWidth: '300px' }}>
         <TextField
-          required={true}
+          required={false}
           label={t('common.password')}
           type="password"
           value={password}
@@ -43,11 +41,7 @@ export const PasswordSetter: FC<Props> = ({ isOpen, onCancel = () => {}, onSave 
           helperText={passwordError ? t('common.fieldRequired') : ''}
           onChange={e => {
             setPassword(e.target.value);
-            if (!validators.required((e ?? '').toString())) {
-              setPasswordErrors(true);
-            } else {
-              setPasswordErrors(false);
-            }
+            setPasswordErrors(false);
           }}
         />
       </DialogContent>

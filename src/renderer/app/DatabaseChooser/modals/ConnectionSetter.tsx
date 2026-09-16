@@ -6,7 +6,11 @@ import { ModalAppBar } from '../../../shared/components/layout/modalAppBar/Modal
 import { useTestConnection } from '../../../shared/hooks/dbSelector/useDBTestConnection';
 import { useForm } from '../../../shared/hooks/form/useForm';
 import type { PostgresConfig } from '../../../shared/types/postgresConfig';
+import type { MySqlConfig } from '../../../shared/types/mysqlConfig';
+import { DatabaseType } from '../../../shared/enums/databaseType';
 import type { Response } from '../../../shared/types/response';
+
+export type ServerConfig = (PostgresConfig | MySqlConfig) & { dbType: DatabaseType };
 import { validators } from '../../../shared/utils/validatorFunctions';
 import { useAppDispatch } from '../../../state/configureStore';
 import { addToast } from '../../../state/pageSlice';
@@ -14,12 +18,13 @@ import { addToast } from '../../../state/pageSlice';
 interface Props {
   isOpen: boolean;
   onCancel?: () => void;
-  onSave?: (config: PostgresConfig) => void;
+  onSave?: (config: ServerConfig) => void;
 }
 export const ConnectionSetter: FC<Props> = ({ isOpen, onCancel = () => {}, onSave = () => {} }) => {
   const { t } = useTranslation();
   const [isFormValid, setIsFormValid] = useState(true);
-  const { form, update } = useForm<PostgresConfig>({
+  const { form, update } = useForm<ServerConfig>({
+    dbType: DatabaseType.postgre,
     host: '',
     port: 5432,
     user: '',
@@ -48,7 +53,7 @@ export const ConnectionSetter: FC<Props> = ({ isOpen, onCancel = () => {}, onSav
   };
 
   const { execute: testConneciton } = useTestConnection({
-    postgresConfig: form,
+    config: form,
     immediate: false,
     onDone: (data: Response<unknown>) => {
       if (!data.success) {
@@ -101,11 +106,27 @@ export const ConnectionSetter: FC<Props> = ({ isOpen, onCancel = () => {}, onSav
           );
         }}
         onSave={data => {
-          onSave(data as PostgresConfig);
+          onSave(data as ServerConfig);
         }}
       />
       <DialogContent sx={{ minWidth: '300px' }}>
         <Grid container spacing={2}>
+          <Grid size={{ xs: 12 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.dbType === DatabaseType.mysql}
+                  onChange={(_e, newValue) => {
+                    const newType = newValue ? DatabaseType.mysql : DatabaseType.postgre;
+                    update('dbType', newType);
+                    if (newType === DatabaseType.mysql && form.port === 5432) update('port', 3306);
+                    if (newType === DatabaseType.postgre && form.port === 3306) update('port', 5432);
+                  }}
+                />
+              }
+              label={form.dbType === DatabaseType.mysql ? 'MySQL' : 'PostgreSQL'}
+            />
+          </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               label={t('common.host')}

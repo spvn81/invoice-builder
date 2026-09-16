@@ -7,6 +7,8 @@ import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { PostgresConfig } from '../types/postgresConfig';
 import { getColumnType, getDefaultValue, insertOrIgnore } from '../utils/dbHelper';
 import { createPostgresAdapter, createSqliteAdapter } from './client';
+import { createMysqlAdapter } from './mysql';
+import type { MySqlConfig } from '../types/mysqlConfig';
 
 const sanitizeDatabaseName = (database: string): string => {
   if (typeof database !== 'string' || database.trim().length === 0) {
@@ -79,6 +81,41 @@ export const openPostgreSql = async (data: PostgresConfig): Promise<{ db: Databa
   return { db: adapter };
 };
 
+export const testMySqlConnection = async (data?: MySqlConfig): Promise<void> => {
+  if (!data) throw new Error('error.connectionFailed');
+
+  const { host, port, user, password, database, ssl } = data;
+
+  try {
+    const mysql = await import('mysql2/promise');
+    const conn = await mysql.createConnection({ host, port, user, password, database, ssl: ssl ? { rejectUnauthorized: false } : undefined });
+    await conn.query('SELECT 1');
+    await conn.end();
+  } catch {
+    throw new Error('error.connectionFailed');
+  }
+};
+
+export const openMySql = async (data: MySqlConfig): Promise<{ db: DatabaseAdapter }> => {
+  const { host, port, user, password, database, ssl } = data;
+  const safeDatabase = sanitizeDatabaseName(database);
+
+  try {
+    const mysql = await import('mysql2/promise');
+    const conn = await mysql.createConnection({ host, port, user, password, ssl: ssl ? { rejectUnauthorized: false } : undefined });
+    const [rows] = await conn.query('SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?', [safeDatabase]);
+    if ((rows as any[]).length === 0) {
+      await conn.query(`CREATE DATABASE \`${safeDatabase}\``);
+    }
+    await conn.end();
+  } catch (err: any) {
+    throw new Error('error.databaseCreationFailed');
+  }
+
+  const adapter = await createMysqlAdapter(data);
+  return { db: adapter };
+};
+
 export const openSqlLite = async (data: {
   fullPath?: string;
   createIfMissing: boolean;
@@ -133,9 +170,9 @@ export const initSchema = async (db: DatabaseAdapter): Promise<void> => {
     await db.run(
       `CREATE TABLE IF NOT EXISTS settings (
       "id" ${getColumnType('INTEGER PRIMARY KEY AUTOINCREMENT', db.type)},
-      "language" TEXT NOT NULL DEFAULT 'en',
-      "amountFormat" TEXT NOT NULL DEFAULT 'en-US',
-      "dateFormat" TEXT NOT NULL DEFAULT 'MM/dd/yyyy',
+      "language" VARCHAR(255) NOT NULL DEFAULT 'en',
+      "amountFormat" VARCHAR(255) NOT NULL DEFAULT 'en-US',
+      "dateFormat" VARCHAR(255) NOT NULL DEFAULT 'MM/dd/yyyy',
       "isDarkMode" INTEGER NOT NULL DEFAULT 1 CHECK ("isDarkMode" IN (0,1)),
       "invoicePrefix" TEXT,
       "invoiceSuffix" TEXT,
@@ -189,7 +226,7 @@ export const initSchema = async (db: DatabaseAdapter): Promise<void> => {
     await db.run(
       `CREATE TABLE IF NOT EXISTS units (
       "id" ${getColumnType('INTEGER PRIMARY KEY AUTOINCREMENT', db.type)},
-      "name" TEXT NOT NULL UNIQUE,
+      "name" VARCHAR(255) NOT NULL UNIQUE,
       "isArchived" INTEGER NOT NULL DEFAULT 0 CHECK ("isArchived" IN (0,1)),
       "createdAt" ${getColumnType('DATETIME', db.type)} NOT NULL DEFAULT ${getDefaultValue("(datetime('now'))", db.type)},
       "updatedAt" ${getColumnType('DATETIME', db.type)} NOT NULL DEFAULT ${getDefaultValue("(datetime('now'))", db.type)}
@@ -198,7 +235,7 @@ export const initSchema = async (db: DatabaseAdapter): Promise<void> => {
     await db.run(
       `CREATE TABLE IF NOT EXISTS categories (
       "id" ${getColumnType('INTEGER PRIMARY KEY AUTOINCREMENT', db.type)},
-      "name" TEXT NOT NULL UNIQUE,
+      "name" VARCHAR(255) NOT NULL UNIQUE,
       "isArchived" INTEGER NOT NULL DEFAULT 0 CHECK ("isArchived" IN (0,1)),
       "createdAt" ${getColumnType('DATETIME', db.type)} NOT NULL DEFAULT ${getDefaultValue("(datetime('now'))", db.type)},
       "updatedAt" ${getColumnType('DATETIME', db.type)} NOT NULL DEFAULT ${getDefaultValue("(datetime('now'))", db.type)}
@@ -207,7 +244,7 @@ export const initSchema = async (db: DatabaseAdapter): Promise<void> => {
     await db.run(
       `CREATE TABLE IF NOT EXISTS currencies (
       "id" ${getColumnType('INTEGER PRIMARY KEY AUTOINCREMENT', db.type)},
-      "code" TEXT NOT NULL UNIQUE,
+      "code" VARCHAR(255) NOT NULL UNIQUE,
       "symbol" TEXT NOT NULL,
       "text" TEXT NOT NULL,
       "format" TEXT NOT NULL,
@@ -221,7 +258,7 @@ export const initSchema = async (db: DatabaseAdapter): Promise<void> => {
       `CREATE TABLE IF NOT EXISTS items (
       "id" ${getColumnType('INTEGER PRIMARY KEY AUTOINCREMENT', db.type)},
       "name" TEXT NOT NULL,
-      "amount" TEXT NOT NULL DEFAULT '0',
+      "amount" VARCHAR(255) NOT NULL DEFAULT '0',
       "unitId" INTEGER,
       "categoryId" INTEGER,
       "description" TEXT,
@@ -235,7 +272,7 @@ export const initSchema = async (db: DatabaseAdapter): Promise<void> => {
     await db.run(
       `CREATE TABLE IF NOT EXISTS invoices (
       "id" ${getColumnType('INTEGER PRIMARY KEY AUTOINCREMENT', db.type)},
-      "invoiceType" TEXT NOT NULL CHECK("invoiceType" IN ('quotation','invoice')),
+      "invoiceType" VARCHAR(255) NOT NULL CHECK("invoiceType" IN ('quotation','invoice')),
       "convertedFromQuotationId" INTEGER NULL,
       "businessId" INTEGER NOT NULL,
       "clientId" INTEGER NOT NULL,
@@ -244,9 +281,9 @@ export const initSchema = async (db: DatabaseAdapter): Promise<void> => {
       "updatedAt" ${getColumnType('DATETIME', db.type)} NOT NULL DEFAULT ${getDefaultValue("(datetime('now'))", db.type)},
       "issuedAt" ${getColumnType('DATETIME', db.type)} NOT NULL,
       "dueDate" ${getColumnType('DATETIME', db.type)},
-      "invoiceNumber" TEXT NOT NULL,
+      "invoiceNumber" VARCHAR(255) NOT NULL,
       "isArchived" INTEGER NOT NULL DEFAULT 0 CHECK ("isArchived" IN (0,1)),
-      "status" TEXT NOT NULL DEFAULT 'unpaid' CHECK ("status" IN ('unpaid','open','closed','partially','paid')),
+      "status" VARCHAR(255) NOT NULL DEFAULT 'unpaid' CHECK ("status" IN ('unpaid','open','closed','partially','paid')),
       "customerNotes" TEXT,
       "thanksNotes" TEXT,
       "termsConditionNotes" TEXT,
@@ -278,13 +315,13 @@ export const initSchema = async (db: DatabaseAdapter): Promise<void> => {
       "shippingFeeCents" INTEGER NOT NULL DEFAULT 0,
       "invoicePrefixSnapshot" TEXT,
       "invoiceSuffixSnapshot" TEXT,
-      "customizationColor" TEXT NOT NULL DEFAULT '#006400',
-      "customizationLogoSize" TEXT NOT NULL DEFAULT 'medium',
-      "customizationFontSizeSize" TEXT NOT NULL DEFAULT 'medium',
-      "customizationLayout" TEXT NOT NULL DEFAULT 'classic',
-      "customizationTableHeaderStyle" TEXT NOT NULL DEFAULT 'light',
-      "customizationTableRowStyle" TEXT NOT NULL DEFAULT 'classic',
-      "customizationPageFormat" TEXT NOT NULL DEFAULT 'A4',
+      "customizationColor" VARCHAR(255) NOT NULL DEFAULT '#006400',
+      "customizationLogoSize" VARCHAR(255) NOT NULL DEFAULT 'medium',
+      "customizationFontSizeSize" VARCHAR(255) NOT NULL DEFAULT 'medium',
+      "customizationLayout" VARCHAR(255) NOT NULL DEFAULT 'classic',
+      "customizationTableHeaderStyle" VARCHAR(255) NOT NULL DEFAULT 'light',
+      "customizationTableRowStyle" VARCHAR(255) NOT NULL DEFAULT 'classic',
+      "customizationPageFormat" VARCHAR(255) NOT NULL DEFAULT 'A4',
       "customizationLabelUpperCase" INTEGER NOT NULL DEFAULT 0 CHECK ("customizationLabelUpperCase" IN (0,1)),
       "customizationWatermarkFileName" TEXT,
       "customizationWatermarkFileType" TEXT,
@@ -378,13 +415,13 @@ export const initSchema = async (db: DatabaseAdapter): Promise<void> => {
     await db.run(`CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices("status")`);
     await db.run(`CREATE INDEX IF NOT EXISTS idx_invoices_issuedAt ON invoices("issuedAt")`);
     await db.run('COMMIT');
-  } catch {
+  } catch (error) {
     try {
       await db.run('ROLLBACK');
     } catch {
       throw new Error(`error.rollbackFailed`);
     }
-    throw new Error(`error.schemaInitFailed`);
+    throw error;
   }
 };
 
