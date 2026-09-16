@@ -11,6 +11,10 @@ export const up = async (db: DatabaseAdapter) => {
       const type = String(colInfo.type).toUpperCase();
       if (type === 'TEXT' || type === 'CHARACTER VARYING' || type === 'VARCHAR') return;
     }
+
+    if (db.type === DatabaseType.mysql) {
+      try { await db.run(`ALTER TABLE invoice_items MODIFY COLUMN "quantity" VARCHAR(255);`); } catch(e) {}
+    }
     if (db.type === DatabaseType.sqlite) {
       await db.run('DROP TABLE IF EXISTS invoice_items_new;');
 

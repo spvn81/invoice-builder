@@ -162,21 +162,21 @@ export const decodeInvoice = <T extends Record<string, unknown>>(invoice: T) => 
   invoiceBankSnapshot: decodeInvoiceBankSnapshotImport(invoice?.invoiceBankSnapshot as InvoiceBankSnapshots)
 });
 
-export const decodeInvoiceBankSnapshotImport = (invoiceB: InvoiceBankSnapshots) => ({
+export const decodeInvoiceBankSnapshotImport = (invoiceB?: InvoiceBankSnapshots) => invoiceB ? {
   ...invoiceB,
   qrCode: invoiceB?.qrCode ? fromBase64(invoiceB.qrCode) : null
-});
+} : undefined;
 
-export const decodeInvoiceBusinessSnapshotImport = (invoiceBS: InvoiceBusinessSnapshots) => ({
+export const decodeInvoiceBusinessSnapshotImport = (invoiceBS?: InvoiceBusinessSnapshots) => invoiceBS ? {
   ...invoiceBS,
   businessLogo: invoiceBS.businessLogo ? fromBase64(invoiceBS.businessLogo) : null
-});
+} : undefined;
 
-export const decodeInvoiceCustomizationImport = (invoiceC: InvoiceCustomization) => ({
+export const decodeInvoiceCustomizationImport = (invoiceC?: InvoiceCustomization) => invoiceC ? {
   ...invoiceC,
   paidWatermarkFileData: invoiceC.paidWatermarkFileData ? fromBase64(invoiceC.paidWatermarkFileData) : null,
   watermarkFileData: invoiceC.watermarkFileData ? fromBase64(invoiceC.watermarkFileData) : null
-});
+} : undefined;
 
 export const decodeInvoiceImport = (invoice: Invoice) => ({
   ...invoice,

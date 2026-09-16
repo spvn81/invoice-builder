@@ -295,6 +295,14 @@ export const up = async (db: DatabaseAdapter) => {
           )
         );
       `);
+      return;
+    }
+    if (db.type === DatabaseType.mysql) {
+      try { await db.run(`ALTER TABLE invoices MODIFY COLUMN "discountAmountCents" VARCHAR(255);`); } catch(e) {}
+      try { await db.run(`ALTER TABLE invoices MODIFY COLUMN "shippingFeeCents" VARCHAR(255);`); } catch(e) {}
+      try { await db.run(`ALTER TABLE invoice_payments MODIFY COLUMN "amountCents" VARCHAR(255);`); } catch(e) {}
+      try { await db.run(`ALTER TABLE invoice_item_snapshots MODIFY COLUMN "unitPriceCents" VARCHAR(255);`); } catch(e) {}
+      return;
     }
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };

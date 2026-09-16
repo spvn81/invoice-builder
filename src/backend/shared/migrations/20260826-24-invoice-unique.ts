@@ -16,6 +16,12 @@ export const up = async (db: DatabaseAdapter) => {
       );
       return;
     }
+    
+    if (db.type === DatabaseType.mysql) {
+      try { await db.run('ALTER TABLE invoices DROP INDEX invoices_businessId_invoiceFullNumber_clientId_key'); } catch(e) {}
+      try { await db.run(`ALTER TABLE invoices ADD UNIQUE INDEX invoices_businessId_invoiceFullNumber_clientId_invoiceType_key ("businessId", "invoiceFullNumber", "clientId", "invoiceType")`); } catch(e) {}
+      return;
+    }
 
     await db.run('DROP TABLE IF EXISTS invoices_new;');
     await db.run(

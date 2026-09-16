@@ -28,7 +28,7 @@ export const createMysqlAdapter = async (config: MySqlConfig): Promise<DatabaseA
   // Enable ANSI_QUOTES mode to allow double quotes for identifiers,
   // matching SQLite and PostgreSQL query syntax.
   pool.on('connection', (connection) => {
-    connection.query('SET SESSION sql_mode = CONCAT(@@sql_mode, ",ANSI_QUOTES")');
+    connection.query('SET SESSION sql_mode = CONCAT(@@sql_mode, ",ANSI_QUOTES,PIPES_AS_CONCAT")');
   });
 
   let connectionInTransaction: PoolConnection | null = null;
@@ -67,14 +67,56 @@ export const createMysqlAdapter = async (config: MySqlConfig): Promise<DatabaseA
     text = text.replace(/"invoiceFullNumber"\s+TEXT/gi, '"invoiceFullNumber" VARCHAR(255)');
     text = text.replace(/"invoiceType"\s+TEXT/gi, '"invoiceType" VARCHAR(255)');
     text = text.replace(/"status"\s+TEXT/gi, '"status" VARCHAR(255)');
+    text = text.replace(/"businessName"\s+TEXT/gi, '"businessName" VARCHAR(255)');
+    text = text.replace(/"clientName"\s+TEXT/gi, '"clientName" VARCHAR(255)');
+    text = text.replace(/"businessNameSnapshot"\s+TEXT/gi, '"businessNameSnapshot" VARCHAR(255)');
+    text = text.replace(/"clientNameSnapshot"\s+TEXT/gi, '"clientNameSnapshot" VARCHAR(255)');
+    text = text.replace(/"businessShortName"\s+TEXT/gi, '"businessShortName" VARCHAR(255)');
+    text = text.replace(/"clientCode"\s+TEXT/gi, '"clientCode" VARCHAR(255)');
+    text = text.replace(/"currencyCode"\s+TEXT/gi, '"currencyCode" VARCHAR(255)');
+    text = text.replace(/"businessShortNameSnapshot"\s+TEXT/gi, '"businessShortNameSnapshot" VARCHAR(255)');
+    text = text.replace(/"clientCodeSnapshot"\s+TEXT/gi, '"clientCodeSnapshot" VARCHAR(255)');
+    text = text.replace(/"currencyCodeSnapshot"\s+TEXT/gi, '"currencyCodeSnapshot" VARCHAR(255)');
+    text = text.replace(/"itemName"\s+TEXT/gi, '"itemName" VARCHAR(255)');
+    text = text.replace(/"itemNameSnapshot"\s+TEXT/gi, '"itemNameSnapshot" VARCHAR(255)');
+    text = text.replace(/"bankName"\s+TEXT/gi, '"bankName" VARCHAR(255)');
+    text = text.replace(/"accountNumber"\s+TEXT/gi, '"accountNumber" VARCHAR(255)');
+    
+    // MySQL does not support CAST(... AS BIGINT), it requires SIGNED or UNSIGNED
+    text = text.replace(/CAST\("([^"]+)"\s+AS\s+BIGINT\)/gi, 'CAST("$1" AS SIGNED)');
 
     // MySQL does not allow CHECK constraints to refer to AUTO_INCREMENT columns.
     text = text.replace(/,\s*CHECK\s*\(\s*"convertedFromQuotationId"\s*IS\s*NULL\s*OR\s*"convertedFromQuotationId"\s*!=\s*"id"\s*\)/gi, '');
+    
+    // MySQL blocks column renames if a CHECK constraint exists on the column.
+    text = text.replace(/\s*CHECK\s*\(\s*"customizationLabelUpperCase"\s*IN\s*\(\s*0\s*,\s*1\s*\)\s*\)/gi, '');
 
-    // MySQL does not support CREATE INDEX IF NOT EXISTS.
-    text = text.replace(/CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS/gi, 'CREATE INDEX');
+    let trimmed = text.trim();
 
-    const trimmed = text.trim().toUpperCase();
+    if (text.match(/CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS/i)) {
+      // Extract index name and table name
+      const match = text.match(/CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+([^\s]+)\s+ON\s+([^\s(]+)/i);
+      if (match) {
+        const indexName = match[1];
+        const tableName = match[2];
+        const checkSql = `
+          SELECT COUNT(1) as count 
+          FROM INFORMATION_SCHEMA.STATISTICS 
+          WHERE table_schema = DATABASE() 
+            AND table_name = ? 
+            AND index_name = ?`;
+        const executor = connectionInTransaction || pool;
+        const [rows]: any = await executor.query(checkSql, [tableName, indexName]);
+        if (rows[0].count > 0) {
+          // Index already exists, skip creating it to avoid metadata lock deadlocks
+          return { rows: [], insertId: 0, affectedRows: 0 };
+        }
+        // If it doesn't exist, we run the CREATE INDEX command (without IF NOT EXISTS)
+        text = text.replace(/CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS/gi, 'CREATE INDEX');
+        trimmed = text.trim();
+      }
+    }
+
     if (trimmed === 'BEGIN' || trimmed.startsWith('BEGIN ')) {
       const conn = await acquireConnection();
       await conn.query('START TRANSACTION');
@@ -92,7 +134,10 @@ export const createMysqlAdapter = async (config: MySqlConfig): Promise<DatabaseA
           affectedRows: res && 'affectedRows' in res ? res.affectedRows : 0
         };
       } catch (err: any) {
-        if (err.code === 'ER_DUP_KEYNAME' || err.errno === 1061) {
+        if (err.code === 'ER_DUP_KEYNAME' || err.errno === 1061 || err.code === 'ER_DUP_FIELDNAME' || err.errno === 1060 || err.code === 'ER_CANT_DROP_FIELD_OR_KEY' || err.errno === 1091) {
+          return { rows: [], insertId: 0, affectedRows: 0 };
+        }
+        if (err.code === 'ER_LOCK_DEADLOCK' && trimmed.toUpperCase().startsWith('CREATE INDEX')) {
           return { rows: [], insertId: 0, affectedRows: 0 };
         }
         throw err;
@@ -103,14 +148,17 @@ export const createMysqlAdapter = async (config: MySqlConfig): Promise<DatabaseA
 
     if (connectionInTransaction) {
       try {
-        const [res] = await connectionInTransaction.query(text, params);
+        const [res] = await connectionInTransaction.query(trimmed, params);
         return {
           rows: Array.isArray(res) ? res : [res],
           insertId: res && 'insertId' in res ? res.insertId : 0,
           affectedRows: res && 'affectedRows' in res ? res.affectedRows : 0
         };
       } catch (err: any) {
-        if (err.code === 'ER_DUP_KEYNAME' || err.errno === 1061) {
+        if (err.code === 'ER_DUP_KEYNAME' || err.errno === 1061 || err.code === 'ER_DUP_FIELDNAME' || err.errno === 1060 || err.code === 'ER_CANT_DROP_FIELD_OR_KEY' || err.errno === 1091) {
+          return { rows: [], insertId: 0, affectedRows: 0 };
+        }
+        if (err.code === 'ER_LOCK_DEADLOCK' && trimmed.toUpperCase().startsWith('CREATE INDEX')) {
           return { rows: [], insertId: 0, affectedRows: 0 };
         }
         throw err;
@@ -118,14 +166,17 @@ export const createMysqlAdapter = async (config: MySqlConfig): Promise<DatabaseA
     }
 
     try {
-      const [res] = await pool.query(text, params);
+      const [res] = await pool.query(trimmed, params);
       return {
         rows: Array.isArray(res) ? res : [res],
         insertId: res && 'insertId' in res ? res.insertId : 0,
         affectedRows: res && 'affectedRows' in res ? res.affectedRows : 0
       };
     } catch (err: any) {
-      if (err.code === 'ER_DUP_KEYNAME' || err.errno === 1061) {
+      if (err.code === 'ER_DUP_KEYNAME' || err.errno === 1061 || err.code === 'ER_DUP_FIELDNAME' || err.errno === 1060 || err.code === 'ER_CANT_DROP_FIELD_OR_KEY' || err.errno === 1091) {
+        return { rows: [], insertId: 0, affectedRows: 0 };
+      }
+      if (err.code === 'ER_LOCK_DEADLOCK' && trimmed.toUpperCase().startsWith('CREATE INDEX')) {
         return { rows: [], insertId: 0, affectedRows: 0 };
       }
       console.error('MySQL Query Failed:', text, err);

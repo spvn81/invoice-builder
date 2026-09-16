@@ -270,6 +270,22 @@ export const up = async (db: DatabaseAdapter) => {
         ALTER TABLE invoices
         ADD CONSTRAINT "invoices_businessId_invoiceFullNumber_key" UNIQUE ("businessId", "invoiceFullNumber");
       `);
+      return;
+    }
+    
+    if (db.type === DatabaseType.mysql) {
+      try { await db.run(`ALTER TABLE invoices RENAME COLUMN "invoicePrefixSnapshot" TO "invoicePrefix";`); } catch(e) {}
+      try { await db.run(`ALTER TABLE invoices RENAME COLUMN "invoiceSuffixSnapshot" TO "invoiceSuffix";`); } catch(e) {}
+      try { await db.run(`ALTER TABLE invoices ADD COLUMN "language" VARCHAR(255) NOT NULL DEFAULT 'en';`); } catch(e) {}
+      try { await db.run(`
+        ALTER TABLE invoices
+        ADD COLUMN "invoiceFullNumber" VARCHAR(255) GENERATED ALWAYS AS (
+          CONCAT(COALESCE(\`invoicePrefix\`, ''), \`invoiceNumber\`, COALESCE(\`invoiceSuffix\`, ''))
+        ) STORED;
+      `); } catch(e) {}
+      try { await db.run(`ALTER TABLE invoices DROP INDEX invoices_businessId_invoiceNumber_key;`); } catch(e) {}
+      try { await db.run(`ALTER TABLE invoices ADD UNIQUE INDEX invoices_businessId_invoiceFullNumber_key ("businessId", "invoiceFullNumber");`); } catch(e) {}
+      return;
     }
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };

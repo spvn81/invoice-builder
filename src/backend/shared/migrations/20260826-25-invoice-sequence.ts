@@ -21,6 +21,13 @@ export const up = async (db: DatabaseAdapter) => {
       );
       return;
     }
+    
+    if (db.type === DatabaseType.mysql) {
+      try { await db.run(`ALTER TABLE invoice_sequences ADD COLUMN "invoiceType" VARCHAR(255) NOT NULL DEFAULT 'invoice'`); } catch(e) {}
+      try { await db.run('ALTER TABLE invoice_sequences DROP INDEX invoice_sequences_businessId_clientId_key'); } catch(e) {}
+      try { await db.run(`ALTER TABLE invoice_sequences ADD UNIQUE INDEX invoice_sequences_business_client_type_unique ("businessId", "clientId", "invoiceType")`); } catch(e) {}
+      return;
+    }
 
     await db.run('DROP TABLE IF EXISTS invoice_sequences_new;');
 

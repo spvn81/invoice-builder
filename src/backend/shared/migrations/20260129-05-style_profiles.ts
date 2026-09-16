@@ -312,6 +312,11 @@ export const up = async (db: DatabaseAdapter) => {
         ADD COLUMN IF NOT EXISTS "styleProfileNameSnapshot" TEXT;
       `);
     }
+    
+    if (db.type === DatabaseType.mysql) {
+      try { await db.run(`ALTER TABLE invoices ADD COLUMN "styleProfilesId" INTEGER;`); } catch (e) {}
+      try { await db.run(`ALTER TABLE invoices ADD COLUMN "styleProfileNameSnapshot" VARCHAR(255);`); } catch (e) {}
+    }
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };
   }

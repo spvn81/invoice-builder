@@ -49,7 +49,7 @@
     "docker:compose:down": "docker compose down -d",
     "dev": "npm run dev:clean:backend && concurrently \"npm:dev:react\" \"npm:dev:preload\" \"npm:dev:migrations\" \"npm:dev:electron\" \"npm:dev:electron:start:wait\"",
     "dev:clean:backend": "rimraf dist-be/backend",
-    "dev:webserver": "set TS_NODE_PROJECT=tsconfig.webserver.json && npx tsx --watch src/backend/webserver/main.ts",
+    "dev:webserver": "set TS_NODE_PROJECT=tsconfig.webserver.json && npx tsx --watch-path=src/backend src/backend/webserver/main.ts",
     "dev:fe": "concurrently \"npm:dev:react\" \"npm:dev:preload\" \"npm:dev:migrations\"",
     "dev:preload": "vite build --config vite.preload.config.ts --watch",
     "dev:react": "vite",

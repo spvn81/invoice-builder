@@ -39,7 +39,7 @@ export const up = async (db: DatabaseAdapter) => {
     for (const table of tables) {
        const cols = await getTableColumns(db, table);
        if (!cols.find(c => c.name === 'workspace_id')) {
-          const typeDef = db.type === DatabaseType.postgre ? 'VARCHAR(36) NOT NULL DEFAULT \'default\'' : 'VARCHAR(36) NOT NULL DEFAULT "default"';
+          const typeDef = "VARCHAR(36) NOT NULL DEFAULT 'default'";
           await db.run(`ALTER TABLE ${table} ADD COLUMN "workspace_id" ${typeDef};`);
        }
     }

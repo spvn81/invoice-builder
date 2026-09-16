@@ -18,8 +18,8 @@ export const ProtectedRoute: FC<PropsWithChildren> = ({ children }) => {
         })
           .then(res => res.json())
           .then(data => {
-            if (data.success && data.user) {
-              dispatch(setAuth(data.user));
+            if (data.success && data.data) {
+              dispatch(setAuth(data.data));
             } else {
               dispatch(setAuth(null));
             }

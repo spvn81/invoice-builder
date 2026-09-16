@@ -10,12 +10,8 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
   const from = process.env.SMTP_FROM || config?.SMTP_FROM || 'noreply@invoice-builder.com';
 
   if (!host) {
-    console.warn('SMTP_HOST is not configured. Email will be logged to console instead of sending.');
-    console.log('--- EMAIL ---');
-    console.log(`To: ${to}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Body: ${html}`);
-    console.log('-------------');
+    const fs = require('fs');
+    fs.appendFileSync('email.log', `--- EMAIL ---\nTo: ${to}\nSubject: ${subject}\nBody: ${html}\n-------------\n`);
     return;
   }
 

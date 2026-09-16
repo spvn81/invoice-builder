@@ -232,6 +232,15 @@ export const up = async (db: DatabaseAdapter) => {
       `);
       await db.run(`CREATE INDEX IF NOT EXISTS idx_invoices_styleProfilesId ON invoices("styleProfilesId")`);
       await db.run(`CREATE INDEX IF NOT EXISTS idx_invoices_bankId ON invoices("bankId")`);
+      return;
+    }
+    if (db.type === DatabaseType.mysql) {
+      try { await db.run(`ALTER TABLE invoices ADD COLUMN "bankId" INTEGER;`); } catch(e) {}
+      try { await db.run(`ALTER TABLE invoices ADD CONSTRAINT invoices_bankId_fkey FOREIGN KEY ("bankId") REFERENCES banks("id");`); } catch(e) {}
+      try { await db.run(`ALTER TABLE invoices ADD CONSTRAINT invoices_styleProfilesId_fkey FOREIGN KEY ("styleProfilesId") REFERENCES style_profiles("id");`); } catch(e) {}
+      try { await db.run(`CREATE INDEX idx_invoices_styleProfilesId ON invoices("styleProfilesId")`); } catch(e) {}
+      try { await db.run(`CREATE INDEX idx_invoices_bankId ON invoices("bankId")`); } catch(e) {}
+      return;
     }
 
     await db.run(`CREATE INDEX IF NOT EXISTS idx_invoices_active ON invoices("isArchived")`);

@@ -159,7 +159,7 @@ const apiGet = async <T>(path: string, params?: Record<string, string>): Promise
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { credentials: 'include' });
   return res.json() as Promise<T>;
 };
 
@@ -169,7 +169,7 @@ const apiGetBlob = async (path: string, params?: Record<string, string>): Promis
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
 
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { credentials: 'include' });
   if (res.ok) {
     const buffer = await res.arrayBuffer();
     return { success: true, data: new Uint8Array(buffer) } as Response<Uint8Array | undefined>;
@@ -181,7 +181,7 @@ const apiGetBlob = async (path: string, params?: Record<string, string>): Promis
 const apiPost = async <T>(path: string, body?: unknown): Promise<T> => {
   const url = baseUrl() + path;
 
-  const options: RequestInit = { method: 'POST' };
+  const options: RequestInit = { method: 'POST', credentials: 'include' };
 
   if (body instanceof FormData) {
     options.body = body;
@@ -199,6 +199,7 @@ const apiPut = async <T>(path: string, body?: unknown): Promise<T> => {
   const res = await fetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: body !== undefined ? JSON.stringify(body) : undefined
   });
   return res.json() as Promise<T>;
@@ -206,7 +207,7 @@ const apiPut = async <T>(path: string, body?: unknown): Promise<T> => {
 
 const apiDelete = async <T>(path: string): Promise<T> => {
   const url = baseUrl() + path;
-  const res = await fetch(url, { method: 'DELETE' });
+  const res = await fetch(url, { method: 'DELETE', credentials: 'include' });
   return res.json() as Promise<T>;
 };
 
