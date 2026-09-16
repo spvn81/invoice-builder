@@ -33,6 +33,7 @@ import { HomePage } from './pages/home';
 import { LoginPage } from './pages/auth/Login';
 import { RegisterPage } from './pages/auth/Register';
 import { VerifyPage } from './pages/auth/Verify';
+import { DatabaseSelectorPage } from './pages/auth/DatabaseSelector';
 
 const createRouter = () => {
   const routes = [
@@ -51,6 +52,16 @@ const createRouter = () => {
     {
       path: '/verify-email',
       element: <VerifyPage />
+    },
+    {
+      path: '/select-database',
+      element: (
+        <ProtectedRoute>
+          <ThemeProviderWrapper>
+            <DatabaseSelectorPage />
+          </ThemeProviderWrapper>
+        </ProtectedRoute>
+      )
     },
     {
       path: '/',
@@ -112,3 +123,4 @@ const startApp = async () => {
 };
 
 startApp();
+

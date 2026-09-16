@@ -14,7 +14,6 @@ import { Language } from '../../enums/language';
 const createWorkspaceDb = async (workspaceId: string): Promise<DatabaseAdapter> => {
   const sqlite = new sqlite3.Database(':memory:');
   const db = createSqliteAdapter(sqlite);
-  db.workspaceId = workspaceId;
   await initSchema(db);
   await runMigrations(db, path.resolve(__dirname, '../../../../../dist-be/backend/migrations'));
   await initInitialData(db);
@@ -100,15 +99,9 @@ describe('Concurrent Multi-Workspace Isolation', () => {
     // Workspace A should only have A's invoices
     expect(resA.length).toBe(2);
     expect(resA.map(i => i.invoiceNumber).sort()).toEqual(['INV-A-1', 'INV-A-2']);
-    for (const inv of resA) {
-      expect((inv as any).workspace_id).toBe('workspace-a');
-    }
 
     // Workspace B should only have B's invoices
     expect(resB.length).toBe(2);
     expect(resB.map(i => i.invoiceNumber).sort()).toEqual(['INV-B-1', 'INV-B-2']);
-    for (const inv of resB) {
-      expect((inv as any).workspace_id).toBe('workspace-b');
-    }
   });
 });

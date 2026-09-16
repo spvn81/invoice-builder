@@ -26,8 +26,12 @@ export const LoginPage: FC = () => {
       const data = await res.json();
       
       if (data.success) {
-         dispatch(setAuth(data.user));
-         navigate('/invoices');
+         dispatch(setAuth(data.data));
+         if (data.data.databaseSelectionRequired) {
+             navigate('/select-database');
+         } else {
+             navigate('/invoices');
+         }
       } else {
          setError(data.message || 'Login failed');
       }

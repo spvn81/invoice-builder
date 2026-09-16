@@ -8,8 +8,7 @@ import { getSystemDb } from '../../shared/db/systemDb';
 import { APP_CONFIG } from '../config';
 import { sendEmail } from '../services/emailService';
 import { authMiddleware, type AuthRequest } from '../middlewares/authMiddleware';
-import { setupDB } from '../database';
-import { DatabaseType } from '../../shared/enums/databaseType';
+import { ensureDefaultUserDatabase } from '../../shared/services/userDatabaseService';
 
 const generateUsername = async (db: any) => {
   let unique = false;
@@ -54,7 +53,7 @@ export const initAuthController = (app: Express) => {
       
       const token = crypto.randomBytes(32).toString('hex');
       const tokenHash = await bcrypt.hash(token, 10);
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // Pass Date object for adapter compatibility
 
       await db.run('BEGIN');
       try {
@@ -74,6 +73,8 @@ export const initAuthController = (app: Express) => {
       const verifyLink = `${appUrl}/verify-email?token=${token}&email=${encodeURIComponent(email)}`;
       const emailHtml = `<p>Hello,</p><p>Please verify your email by clicking the link below:</p><p><a href="${verifyLink}">${verifyLink}</a></p>`;
       
+      console.log(`\n=========================================\n[DEV] Verification Link:\n${verifyLink}\nToken: ${token}\n=========================================\n`);
+
       try {
         await sendEmail(email, 'Verify your email - Invoice Builder', emailHtml);
       } catch (e) {
@@ -95,7 +96,7 @@ export const initAuthController = (app: Express) => {
       }
 
       const db = await getSystemDb();
-      const userRes = await db.query('SELECT * FROM users WHERE email = ? AND status = "pending"', [email]);
+      const userRes = await db.query("SELECT * FROM users WHERE email = ? AND status = 'pending'", [email]);
       if (!userRes.rows || userRes.rows.length === 0) {
         res.status(400).json({ success: false, message: 'error.invalidOrAlreadyVerified' });
         return;
@@ -117,18 +118,12 @@ export const initAuthController = (app: Express) => {
       // Verification successful!
       const username = await generateUsername(db);
       const workspaceId = uuidv4();
-      const dbId = uuidv4();
-      const dbDir = path.resolve(process.cwd(), process.env.DB_DIRECTORY || APP_CONFIG?.DB_DIRECTORY || 'data', 'users', user.id, 'databases');
-      const dbPath = path.resolve(dbDir, `${username}.db`);
 
       await db.run('BEGIN');
       try {
         await db.run('INSERT INTO workspaces (id, name) VALUES (?, ?)', [workspaceId, 'Default Workspace']);
-        await db.run('UPDATE users SET username = ?, default_workspace_id = ?, email_verified = 1, status = "active", verification_token_hash = NULL WHERE id = ?', [
+        await db.run("UPDATE users SET username = ?, default_workspace_id = ?, email_verified = 1, status = 'active', verification_token_hash = NULL WHERE id = ?", [
           username, workspaceId, user.id
-        ]);
-        await db.run(`INSERT INTO user_databases (id, user_id, workspace_id, database_name, database_path, database_type, is_default) VALUES (?, ?, ?, ?, ?, ?, 1)`, [
-          dbId, user.id, workspaceId, `${username}.db`, dbPath, DatabaseType.sqlite
         ]);
         await db.run('COMMIT');
       } catch (err) {
@@ -138,16 +133,9 @@ export const initAuthController = (app: Express) => {
 
       // Initialize the database!
       try {
-        await setupDB({
-          workspaceId,
-          dbType: DatabaseType.sqlite,
-          createIfMissing: true,
-          sqliteConfig: { fullPath: dbPath }
-        });
+        await ensureDefaultUserDatabase(user.id);
       } catch (err) {
-        console.error('Failed to setup local database:', err);
-        // We do not fail the request because the user is already active, but they may need to retry DB creation.
-        // Or we could handle rollback above, but DB file creation is separate.
+        console.error('Failed to setup local database during email verification. Will retry on login.', err);
       }
 
       res.json({ success: true, message: 'Email verified successfully', data: { username } });
@@ -222,19 +210,8 @@ export const initAuthController = (app: Express) => {
         return;
       }
 
-      // Initialize the default database into the runtime Map if sqlite
-      const dbRes = await db.query('SELECT * FROM user_databases WHERE user_id = ? AND is_default = 1', [user.id]);
-      if (dbRes.rows && dbRes.rows.length > 0) {
-         const defaultDb = dbRes.rows[0] as any;
-         if (defaultDb.database_type === DatabaseType.sqlite) {
-           await setupDB({
-             workspaceId: user.default_workspace_id,
-             dbType: DatabaseType.sqlite,
-             createIfMissing: false,
-             sqliteConfig: { fullPath: defaultDb.database_path }
-           });
-         }
-      }
+      // Reconcile and ensure valid DB setup
+      const dbResolution = await ensureDefaultUserDatabase(user.id);
 
       const token = jwt.sign(
         { userId: user.id, workspaceId: user.default_workspace_id, username: user.username, email: user.email },
@@ -249,7 +226,17 @@ export const initAuthController = (app: Express) => {
         maxAge: 7 * 24 * 60 * 60 * 1000
       });
 
-      res.json({ success: true, data: { userId: user.id, username: user.username, email: user.email, workspaceId: user.default_workspace_id } });
+      res.json({ 
+        success: true, 
+        data: { 
+          userId: user.id, 
+          username: user.username, 
+          email: user.email, 
+          workspaceId: user.default_workspace_id,
+          databases: dbResolution.databases,
+          databaseSelectionRequired: dbResolution.databaseSelectionRequired
+        } 
+      });
     } catch (err) {
       res.status(500).json({ success: false, message: (err as Error).message });
     }
@@ -282,8 +269,6 @@ export const initAuthController = (app: Express) => {
 
   app.post('/api/auth/logout', async (req: Request, res: Response) => {
     res.clearCookie('token');
-    // We should ideally call clearDbForWorkspace here, but we need the token to know which workspace to clear.
-    // However, clearing cookie is sufficient for client, and the DB connection map can stay cached or we decode token here.
     const token = req.cookies?.token;
     if (token) {
       try {
@@ -297,3 +282,4 @@ export const initAuthController = (app: Express) => {
     res.json({ success: true });
   });
 };
+

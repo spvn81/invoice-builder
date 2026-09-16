@@ -6,6 +6,7 @@ export const RegisterPage: FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,11 +17,17 @@ export const RegisterPage: FC = () => {
     setSuccess('');
     setLoading(true);
 
+    if (password !== passwordConfirmation) {
+      setError('error.passwordMismatch');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, passwordConfirmation })
       });
       const data = await res.json();
       
@@ -69,6 +76,15 @@ export const RegisterPage: FC = () => {
               onChange={e => setPassword(e.target.value)}
               required
               helperText="Must be at least 8 characters"
+            />
+            <TextField
+              label="Confirm Password"
+              type="password"
+              fullWidth
+              margin="normal"
+              value={passwordConfirmation}
+              onChange={e => setPasswordConfirmation(e.target.value)}
+              required
             />
             
             <Button 
