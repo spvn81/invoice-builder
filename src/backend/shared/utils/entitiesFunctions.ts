@@ -9,6 +9,22 @@ import { mapDatabaseError } from './errorFunctions';
 
 import { getHavingClauseFromFilters } from './filterFunctions';
 
+export const deleteEntity = async (db: DatabaseAdapter, table: string, id: number | string) => {
+   if (db.workspaceId) {
+       await db.run(`DELETE FROM ${table} WHERE "id" = ? AND "workspace_id" = ?`, [id, db.workspaceId]);
+   } else {
+       await db.run(`DELETE FROM ${table} WHERE "id" = ?`, [id]);
+   }
+};
+
+export const deleteBy = async (db: DatabaseAdapter, table: string, column: string, value: any) => {
+   if (db.workspaceId) {
+       await db.run(`DELETE FROM ${table} WHERE "${column}" = ? AND "workspace_id" = ?`, [value, db.workspaceId]);
+   } else {
+       await db.run(`DELETE FROM ${table} WHERE "${column}" = ?`, [value]);
+   }
+};
+
 export const getAllEntities =
   <T extends object>(
     db: DatabaseAdapter,
@@ -18,6 +34,7 @@ export const getAllEntities =
     aggregation: InvoiceAggregation
   ): ((filter: FilterData[]) => Promise<Response<(T & EntityWithCounts)[]>>) =>
   async (filter: FilterData[]) => {
+    const whereWorkspace = db.workspaceId ? `WHERE ${alias}."workspace_id" = ?` : '';
     const havingClause = getHavingClauseFromFilters({
       dbType: db.type,
       filters: filter,
@@ -33,12 +50,14 @@ export const getAllEntities =
         ${aggregation.quotesCountExpr} AS "quotesCount"
       FROM ${table} ${alias}
       ${aggregation.joins}
+      ${whereWorkspace}
       GROUP BY ${alias}."id"
       ${havingClause || ''}
       ORDER BY ${alias}."createdAt" DESC
     `;
 
-    const data = await db.all<T & EntityWithCounts>(sql);
+    const params = db.workspaceId ? [db.workspaceId] : [];
+    const data = await db.all<T & EntityWithCounts>(sql, params);
 
     return { success: true, data };
   };
@@ -53,6 +72,10 @@ export const handleEntity =
   ) =>
   async (data: T, isUpdate = false): Promise<Response<T & EntityWithCounts>> => {
     const params = fields.map(key => (data[key] ?? null) as string | number | null);
+    
+    // Auto-inject workspace_id
+    const finalFields = db.workspaceId ? [...fields, 'workspace_id'] : [...fields];
+    const finalParams = db.workspaceId ? [...params, db.workspaceId] : [...params];
 
     try {
       let lastID: number = -1;
@@ -61,17 +84,24 @@ export const handleEntity =
         const setClause =
           fields.map(f => `"${String(f)}" = ?`).join(', ') +
           `, "updatedAt" = ${getDefaultValue("(datetime('now'))", db.type)}`;
-        await db.run(`UPDATE ${table} SET ${setClause} WHERE "id" = ?`, [...params, data.id ?? -1], true);
+        
+        if (db.workspaceId) {
+           await db.run(`UPDATE ${table} SET ${setClause} WHERE "id" = ? AND "workspace_id" = ?`, [...params, data.id ?? -1, db.workspaceId], true);
+        } else {
+           await db.run(`UPDATE ${table} SET ${setClause} WHERE "id" = ?`, [...params, data.id ?? -1], true);
+        }
+        
         lastID = data.id ?? -1;
       } else {
         lastID = await db.run(
-          `INSERT INTO ${table} (${fields.map(f => `"${String(f)}"`).join(',')})
-           VALUES (${fields.map(() => '?').join(',')})`,
-          params,
+          `INSERT INTO ${table} (${finalFields.map(f => `"${String(f)}"`).join(',')})
+           VALUES (${finalFields.map(() => '?').join(',')})`,
+          finalParams,
           true
         );
       }
 
+      const whereWorkspace = db.workspaceId ? `AND ${alias}."workspace_id" = ?` : '';
       const sql = `
         SELECT
           ${alias}.*,
@@ -79,11 +109,12 @@ export const handleEntity =
           ${aggregation.quotesCountExpr} AS "quotesCount"
         FROM ${table} ${alias}
         ${aggregation.joins}
-        WHERE ${alias}."id" = ?
+        WHERE ${alias}."id" = ? ${whereWorkspace}
         GROUP BY ${alias}."id"
       `;
 
-      const row = await db.get<T & EntityWithCounts>(sql, [lastID]);
+      const selectParams = db.workspaceId ? [lastID, db.workspaceId] : [lastID];
+      const row = await db.get<T & EntityWithCounts>(sql, selectParams);
 
       return { success: true, data: row ?? undefined };
     } catch (error) {

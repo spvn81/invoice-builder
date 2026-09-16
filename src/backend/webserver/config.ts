@@ -3,5 +3,6 @@ export const APP_CONFIG = {
   PORT: '3000',
   DB_DIRECTORY: 'data',
   FE_SERVER_URL: 'http://127.0.0.1:5173',
-  VERSION: '2.9.0'
+  VERSION: '2.9.0',
+  JWT_SECRET: process.env.JWT_SECRET || 'fallback-secret-key-do-not-use-in-prod'
 };

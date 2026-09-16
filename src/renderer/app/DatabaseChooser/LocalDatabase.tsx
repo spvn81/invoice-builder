@@ -150,9 +150,45 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
+  const [legacyDbs, setLegacyDbs] = useState<string[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+
   useEffect(() => {
-    if (isWebMode()) getDBList();
+    if (isWebMode()) {
+      getDBList();
+      fetch('/api/databases/legacy', { headers: { 'Accept': 'application/json' } })
+        .then(res => res.json())
+        .then(data => {
+           if (data.success && data.data) {
+              setLegacyDbs(data.data);
+           }
+        })
+        .catch(console.error);
+    }
   }, [getDBList]);
+
+  const handleImportLegacy = async (filename: string) => {
+    setIsImporting(true);
+    try {
+       const res = await fetch('/api/databases/import-legacy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename })
+       });
+       const data = await res.json();
+       if (data.success) {
+          dispatch(addToast({ message: 'Database imported successfully', severity: 'success' }));
+          setLegacyDbs(prev => prev.filter(f => f !== filename));
+          getDBList(); // Refresh saved dbs
+       } else {
+          dispatch(addToast({ message: data.message || 'Failed to import', severity: 'error' }));
+       }
+    } catch (e) {
+       dispatch(addToast({ message: 'Error importing database', severity: 'error' }));
+    } finally {
+       setIsImporting(false);
+    }
+  };
 
   return (
     <Box
@@ -292,31 +328,96 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
                       </Typography>
                     }
                   />
-
-                  <Box sx={{ flexGrow: 1 }} />
-
-                  <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
-
-                  {!isWebMode() && (
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title={t('ariaLabel.remove')}>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleForget(item);
-                          }}
-                        >
-                          <CloseIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  )}
                 </Box>
+
+                {isWebMode() && (
+                  <Tooltip title={t('common.delete')}>
+                    <IconButton
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleForget(item.database_name ?? item);
+                      }}
+                      sx={{
+                        color: theme.palette.error.main,
+                        '&:hover': {
+                          backgroundColor: theme.palette.error.light,
+                          color: theme.palette.error.contrastText
+                        }
+                      }}
+                    >
+                      <CloseIcon />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {!isWebMode() && (
+                  <Tooltip title={t('common.forget')}>
+                    <IconButton
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleForget(item);
+                      }}
+                      sx={{
+                        color: theme.palette.error.main,
+                        '&:hover': {
+                          backgroundColor: theme.palette.error.light,
+                          color: theme.palette.error.contrastText
+                        }
+                      }}
+                    >
+                      <CloseIcon />
+                    </IconButton>
+                  </Tooltip>
+                )}
               </ListItemButton>
             </Paper>
           ))}
+        </Box>
+      )}
+
+      {legacyDbs.length > 0 && (
+        <Box sx={{ mt: 4, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Typography variant="h6" color="warning.main" gutterBottom>
+            Legacy Databases Detected
+          </Typography>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            We found some older databases on the server. Import them to your workspace to use them.
+          </Typography>
+          <Box
+            sx={{
+              display: 'grid',
+              gap: 2,
+              gridTemplateColumns: 'repeat(auto-fit, 300px)',
+              justifyContent: 'center',
+              justifyItems: 'center',
+              width: '100%'
+            }}
+          >
+            {legacyDbs.map(file => (
+              <Paper
+                key={file}
+                elevation={1}
+                sx={{
+                  borderRadius: 1,
+                  bgcolor: theme.palette.background.paper,
+                  p: 2,
+                  width: '300px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <Typography variant="body2" noWrap sx={{ flexGrow: 1, mr: 2 }}>{file}</Typography>
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  onClick={() => handleImportLegacy(file)}
+                  disabled={isImporting}
+                >
+                  Import
+                </Button>
+              </Paper>
+            ))}
+          </Box>
         </Box>
       )}
     </Box>

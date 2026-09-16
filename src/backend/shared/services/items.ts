@@ -110,7 +110,7 @@ export const updateItem = async (db: DatabaseAdapter, data: Item) => {
 
 export const deleteItem = async (db: DatabaseAdapter, id: number) => {
   try {
-    await db.run('DELETE FROM items WHERE "id" = ?;', [id]);
+    await deleteEntity(db, 'items', id);
     return { success: true };
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };

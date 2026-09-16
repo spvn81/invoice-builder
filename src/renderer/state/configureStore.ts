@@ -3,9 +3,12 @@ import { setupListeners } from '@reduxjs/toolkit/query';
 import { useDispatch, useSelector, type TypedUseSelectorHook } from 'react-redux';
 import { pageSlice } from './pageSlice';
 
+import { authSlice } from './authSlice';
+
 export const store = configureStore({
   reducer: {
-    [pageSlice.name]: pageSlice.reducer
+    [pageSlice.name]: pageSlice.reducer,
+    [authSlice.name]: authSlice.reducer
   },
   middleware: getDefaultMiddleware => getDefaultMiddleware().concat()
 });

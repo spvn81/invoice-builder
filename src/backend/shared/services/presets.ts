@@ -233,7 +233,7 @@ export const updatePreset = async (db: DatabaseAdapter, data: Preset): Promise<R
 
 export const deletePreset = async (db: DatabaseAdapter, id: number) => {
   try {
-    await db.run('DELETE FROM presets WHERE "id" = ?;', [id]);
+    await deleteEntity(db, 'presets', id);
     return { success: true };
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };

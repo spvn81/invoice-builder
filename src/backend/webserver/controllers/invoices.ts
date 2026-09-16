@@ -3,13 +3,14 @@ import type { EInvoice } from '../../shared/enums/einvoice';
 import { InvoiceType } from '../../shared/enums/invoiceType';
 import * as invoicesService from '../../shared/services/invoices';
 import { decodeInvoice, encodeResultInvoices } from '../../shared/utils/dataUrlFunctions';
-import { dbInstance } from '../database';
+import { getDbForWorkspace } from '../database';
+import { type AuthRequest } from '../middlewares/authMiddleware';
 import { parseFilter, requireDB } from '../utils/functions';
 
 export const initInvoicesController = (app: Express) => {
   app.get('/api/invoices/xml', requireDB, async (req: Request, res: Response) => {
     const data = req.query as unknown as { invoiceId: number; einvoice: EInvoice };
-    const result = await invoicesService.getInvoiceXML(dbInstance!, data);
+    const result = await invoicesService.getInvoiceXML(getDbForWorkspace((req as AuthRequest).user!.workspaceId), data);
     if (!result.success) {
       res.status(500).json(result);
       return;
@@ -27,18 +28,18 @@ export const initInvoicesController = (app: Express) => {
       clientId: query.clientId,
       invoiceType: query.invoiceType ?? InvoiceType.invoice
     };
-    const result = await invoicesService.getNextSequence(dbInstance!, data);
+    const result = await invoicesService.getNextSequence(getDbForWorkspace((req as AuthRequest).user!.workspaceId), data);
     res.json(result);
   });
   app.get('/api/invoices/headers', requireDB, async (req: Request, res: Response) => {
     const type = req.query.type as 'invoice' | 'quotation';
-    const result = await invoicesService.getCustomHeaders(dbInstance!, type);
+    const result = await invoicesService.getCustomHeaders(getDbForWorkspace((req as AuthRequest).user!.workspaceId), type);
     res.json(result);
   });
   app.get('/api/invoices', requireDB, async (req: Request, res: Response) => {
     const type = req.query.type as 'invoice' | 'quotation' | undefined;
     const filter = parseFilter(req.query.filter as string);
-    const result = await invoicesService.getAllInvoices(dbInstance!, type, filter);
+    const result = await invoicesService.getAllInvoices(getDbForWorkspace((req as AuthRequest).user!.workspaceId), type, filter);
 
     const resultModified = encodeResultInvoices(result);
 
@@ -47,7 +48,7 @@ export const initInvoicesController = (app: Express) => {
   app.post('/api/invoices', requireDB, async (req: Request, res: Response) => {
     const dataModified = decodeInvoice(req.body);
 
-    const result = await invoicesService.addInvoice(dbInstance!, dataModified);
+    const result = await invoicesService.addInvoice(getDbForWorkspace((req as AuthRequest).user!.workspaceId), dataModified);
 
     const resultModified = encodeResultInvoices(result);
     res.json(resultModified);
@@ -55,18 +56,18 @@ export const initInvoicesController = (app: Express) => {
   app.put('/api/invoices', requireDB, async (req: Request, res: Response) => {
     const dataModified = decodeInvoice(req.body);
 
-    const result = await invoicesService.updateInvoice(dbInstance!, dataModified);
+    const result = await invoicesService.updateInvoice(getDbForWorkspace((req as AuthRequest).user!.workspaceId), dataModified);
 
     const resultModified = encodeResultInvoices(result);
     res.json(resultModified);
   });
   app.delete('/api/invoices/:id', requireDB, async (req: Request, res: Response) => {
-    const result = await invoicesService.deleteInvoice(dbInstance!, Number(req.params.id));
+    const result = await invoicesService.deleteInvoice(getDbForWorkspace((req as AuthRequest).user!.workspaceId), Number(req.params.id));
     res.json(result);
   });
   app.post('/api/invoices/duplicate', requireDB, async (req: Request, res: Response) => {
     const { invoiceId, invoiceType } = req.body;
-    const result = await invoicesService.duplicateInvoice(dbInstance!, invoiceId, invoiceType);
+    const result = await invoicesService.duplicateInvoice(getDbForWorkspace((req as AuthRequest).user!.workspaceId), invoiceId, invoiceType);
 
     const resultModified = encodeResultInvoices(result);
     res.json(resultModified);

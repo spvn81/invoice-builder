@@ -82,7 +82,7 @@ export const updateBusiness = (db: DatabaseAdapter, data: Business): Promise<Res
 
 export const deleteBusiness = async (db: DatabaseAdapter, id: number) => {
   try {
-    await db.run('DELETE FROM businesses WHERE "id" = ?;', [id]);
+    await deleteEntity(db, 'businesses', id);
     return { success: true };
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };

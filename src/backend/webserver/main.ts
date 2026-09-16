@@ -1,9 +1,11 @@
 import 'dotenv/config';
 import cors from 'cors';
 import express, { type Request, type Response } from 'express';
+import cookieParser from 'cookie-parser';
 import { APP_CONFIG } from './config';
 import { initControllers } from './controllers';
 import { initDatabaseController } from './controllers/database';
+import { initAuthController } from './controllers/auth';
 
 const port = Number(process.env.PORT) || Number(APP_CONFIG.PORT);
 const server = process.env.DEV_SERVER_URL || APP_CONFIG.DEV_SERVER_URL;
@@ -13,6 +15,7 @@ const version = APP_CONFIG.VERSION;
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
+app.use(cookieParser());
 app.use(
   cors({
     origin: feServer,
@@ -22,6 +25,7 @@ app.use(
 app.set('trust proxy', 1);
 
 const main = async () => {
+  initAuthController(app);
   initDatabaseController(app);
   initControllers(app);
 

@@ -73,9 +73,21 @@ export const Sidebar: FC = () => {
     setIsLogoutConfirmOpen(false);
   }, []);
 
-  const handleLogoutConfirm = useCallback(() => {
+  const handleLogoutConfirm = useCallback(async () => {
     setIsLogoutConfirmOpen(false);
-    dispatch(logout());
+    try {
+      if (typeof window !== 'undefined' && !('electron' in window)) {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        // The page might redirect due to ProtectedRoute state change, or we can force reload
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    dispatch(logout()); // from pageSlice
+    // Actually we should reload or redirect to /home for web mode
+    if (typeof window !== 'undefined' && !('electron' in window)) {
+       window.location.href = '/home';
+    }
   }, [dispatch]);
 
   const menuItems = [

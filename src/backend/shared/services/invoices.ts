@@ -860,7 +860,7 @@ export const getAllInvoices = async (db: DatabaseAdapter, type?: 'invoice' | 'qu
 
 export const deleteInvoice = async (db: DatabaseAdapter, id: number) => {
   try {
-    await db.run('DELETE FROM invoices WHERE "id" = ?;', [id]);
+    await deleteEntity(db, 'invoices', id);
     return { success: true };
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };
@@ -1105,7 +1105,7 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
       }
     } else if (data.bankId == undefined) {
       // Bank was cleared from the invoice; drop the stale snapshot row.
-      await db.run('DELETE FROM invoice_bank_snapshots WHERE "parentInvoiceId" = ?;', [data.id]);
+      await deleteBy(db, 'invoice_bank_snapshots', 'parentInvoiceId', data.id);
     }
     if (data.businessId != undefined && data.invoiceBusinessSnapshot) {
       const ibs = await handleInvoiceBusinessSnapshots(
@@ -1159,7 +1159,7 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
       }
     }
 
-    await db.run('DELETE FROM invoice_items WHERE "parentInvoiceId" = ?;', [data.id]);
+    await deleteBy(db, 'invoice_items', 'parentInvoiceId', data.id);
 
     const itemsResult = await processItems(
       db,
@@ -1178,7 +1178,7 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         [data.id, ...ids]
       );
     } else {
-      await db.run(`DELETE FROM invoice_payments WHERE "parentInvoiceId" = ?`, [data.id]);
+      await deleteBy(db, 'invoice_payments', 'parentInvoiceId', data.id);
     }
 
     const paymentsResult = await processPayments(db, { handleInvoicePayments }, data.id, data.invoicePayments);
@@ -1186,7 +1186,7 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
       return { success: false, key: paymentsResult.key, message: paymentsResult.message };
     }
 
-    await db.run('DELETE FROM attachments WHERE "parentInvoiceId" = ?;', [data.id]);
+    await deleteBy(db, 'attachments', 'parentInvoiceId', data.id);
     const attachmentsResult = await processAttachments(db, { handleAttachments }, data.id, data.invoiceAttachments);
     if (!attachmentsResult.success) {
       return { success: false, key: attachmentsResult.key, message: attachmentsResult.message };
@@ -1242,7 +1242,11 @@ export const duplicateInvoice = async (
     const isQuotationConversion = original.invoiceType === 'quotation' && invoiceType === 'invoice';
     if (isQuotationConversion) {
       convertedFromQuotationId = original.id as number;
-      await db.run(`UPDATE invoices SET "status" = 'closed' WHERE "id" = ?;`, [original.id as number]);
+      if (db.workspaceId) {
+        await db.run(`UPDATE invoices SET "status" = 'closed' WHERE "id" = ? AND "workspace_id" = ?;`, [original.id as number, db.workspaceId]);
+      } else {
+        await db.run(`UPDATE invoices SET "status" = 'closed' WHERE "id" = ?;`, [original.id as number]);
+      }
     }
 
     const handleSequences = handleEntity<InvoiceSequence>(db, 'invoice_sequences', invoiceSequencesFields);
@@ -1259,8 +1263,11 @@ export const duplicateInvoice = async (
     }
     const newInvoiceNumber = numberResult.data;
 
+    const finalFields = db.workspaceId ? '("workspace_id", ' : '(';
+    const finalSelect = db.workspaceId ? '?, ' : '';
+
     const insertInvoiceSQL = `
-        INSERT INTO invoices (
+        INSERT INTO invoices ${finalFields}
           "invoiceType", "convertedFromQuotationId", "businessId", "clientId", "currencyId",
           "issuedAt", "dueDate", "invoiceNumber", "isArchived", "status", "customerNotes",
           "thanksNotes", "termsConditionNotes", "discountName", "language", 
@@ -1270,7 +1277,7 @@ export const duplicateInvoice = async (
           "surchargeName", "surchargeAmountCents", "surchargePercent", "surchargeType", "layoutId"
         )
         SELECT
-          ?, ?, "businessId", "clientId", "currencyId",
+          ${finalSelect} ?, ?, "businessId", "clientId", "currencyId",
           ${getDefaultValue("(datetime('now'))", db.type)},  
           CASE 
             WHEN "dueDate" IS NULL THEN NULL
@@ -1284,9 +1291,13 @@ export const duplicateInvoice = async (
         FROM invoices WHERE "id" = ?
       `;
 
+    const finalParams = db.workspaceId
+        ? [db.workspaceId, invoiceType, convertedFromQuotationId, newInvoiceNumber, status, invoiceId]
+        : [invoiceType, convertedFromQuotationId, newInvoiceNumber, status, invoiceId];
+
     let duplicatedRowID: number | void = await db.run(
       insertInvoiceSQL,
-      [invoiceType, convertedFromQuotationId, newInvoiceNumber, status, invoiceId],
+      finalParams,
       true
     );
     duplicatedRowID = typeof duplicatedRowID === 'number' ? duplicatedRowID : -1;
@@ -1294,14 +1305,21 @@ export const duplicateInvoice = async (
     const duplicateSnapshot = async (table: string, columns: string[]) => {
       const columnList = columns.map(c => `"${c}"`).join(', ');
 
+      const finalFields = db.workspaceId ? '("workspace_id", "parentInvoiceId", ' : '("parentInvoiceId", ';
+      const finalSelect = db.workspaceId ? '?, ?, ' : '?, ';
+
       const sql = `
-        INSERT INTO ${table} ("parentInvoiceId", ${columnList})
-        SELECT ?, ${columnList}
+        INSERT INTO ${table} ${finalFields} ${columnList})
+        SELECT ${finalSelect} ${columnList}
         FROM ${table}
         WHERE "parentInvoiceId" = ?;
       `;
 
-      await db.run(sql, [duplicatedRowID, invoiceId]);
+      if (db.workspaceId) {
+        await db.run(sql, [db.workspaceId, duplicatedRowID, invoiceId]);
+      } else {
+        await db.run(sql, [duplicatedRowID, invoiceId]);
+      }
     };
 
     await duplicateSnapshot('invoice_bank_snapshots', [
@@ -1381,40 +1399,68 @@ export const duplicateInvoice = async (
     await duplicateSnapshot('invoice_style_profile_snapshots', ['styleProfileName']);
     await duplicateSnapshot('invoice_layout_snapshots', ['layoutSchema']);
 
-    await db.run(
-      `INSERT INTO invoice_items ("parentInvoiceId", "itemId", "quantity", "taxRate", "taxType", "customField")
-       SELECT ?, "itemId", "quantity", "taxRate", "taxType", "customField"
-       FROM invoice_items WHERE "parentInvoiceId" = ?;`,
-      [duplicatedRowID, invoiceId]
-    );
+    const insertItemsSQL = db.workspaceId 
+       ? `INSERT INTO invoice_items ("workspace_id", "parentInvoiceId", "itemId", "quantity", "taxRate", "taxType", "customField")
+          SELECT ?, ?, "itemId", "quantity", "taxRate", "taxType", "customField"
+          FROM invoice_items WHERE "parentInvoiceId" = ?;`
+       : `INSERT INTO invoice_items ("parentInvoiceId", "itemId", "quantity", "taxRate", "taxType", "customField")
+          SELECT ?, "itemId", "quantity", "taxRate", "taxType", "customField"
+          FROM invoice_items WHERE "parentInvoiceId" = ?;`;
+          
+    const itemsParams = db.workspaceId ? [db.workspaceId, duplicatedRowID, invoiceId] : [duplicatedRowID, invoiceId];
+    await db.run(insertItemsSQL, itemsParams);
 
-    await db.run(
-      `INSERT INTO invoice_item_snapshots (
-        "parentInvoiceItemId",
-        "itemName",
-        "unitPriceCents",
-        "unitName"
-      )
-      SELECT
-        "newItems"."id",
-        snap."itemName",
-        snap."unitPriceCents",
-        snap."unitName"
-      FROM invoice_item_snapshots AS snap
-      JOIN invoice_items AS "oldItems"
-        ON snap."parentInvoiceItemId" = "oldItems"."id"
-      JOIN invoice_items AS "newItems"
-       ON "newItems"."itemId" = "oldItems"."itemId"
-       AND "newItems"."parentInvoiceId" = ?
-      WHERE "oldItems"."parentInvoiceId" = ?;`,
-      [duplicatedRowID, invoiceId]
-    );
+    const insertItemSnapshotsSQL = db.workspaceId
+      ? `INSERT INTO invoice_item_snapshots (
+          "workspace_id",
+          "parentInvoiceItemId",
+          "itemName",
+          "unitPriceCents",
+          "unitName"
+        )
+        SELECT
+          ?,
+          "newItems"."id",
+          snap."itemName",
+          snap."unitPriceCents",
+          snap."unitName"
+        FROM invoice_item_snapshots AS snap
+        JOIN invoice_items AS "oldItems"
+          ON snap."parentInvoiceItemId" = "oldItems"."id"
+        JOIN invoice_items AS "newItems"
+         ON "newItems"."itemId" = "oldItems"."itemId"
+         AND "newItems"."parentInvoiceId" = ?
+        WHERE "oldItems"."parentInvoiceId" = ?;`
+      : `INSERT INTO invoice_item_snapshots (
+          "parentInvoiceItemId",
+          "itemName",
+          "unitPriceCents",
+          "unitName"
+        )
+        SELECT
+          "newItems"."id",
+          snap."itemName",
+          snap."unitPriceCents",
+          snap."unitName"
+        FROM invoice_item_snapshots AS snap
+        JOIN invoice_items AS "oldItems"
+          ON snap."parentInvoiceItemId" = "oldItems"."id"
+        JOIN invoice_items AS "newItems"
+         ON "newItems"."itemId" = "oldItems"."itemId"
+         AND "newItems"."parentInvoiceId" = ?
+        WHERE "oldItems"."parentInvoiceId" = ?;`;
+        
+    const itemSnapshotsParams = db.workspaceId ? [db.workspaceId, duplicatedRowID, invoiceId] : [duplicatedRowID, invoiceId];
+    await db.run(insertItemSnapshotsSQL, itemSnapshotsParams);
 
-    await db.run(
-      `INSERT INTO attachments ("parentInvoiceId", "fileName", "fileType", "fileSize", "data")
-       SELECT ?, "fileName", "fileType", "fileSize", "data" FROM attachments WHERE "parentInvoiceId" = ?;`,
-      [duplicatedRowID, invoiceId]
-    );
+    const insertAttachmentsSQL = db.workspaceId
+      ? `INSERT INTO attachments ("workspace_id", "parentInvoiceId", "fileName", "fileType", "fileSize", "data")
+         SELECT ?, ?, "fileName", "fileType", "fileSize", "data" FROM attachments WHERE "parentInvoiceId" = ?;`
+      : `INSERT INTO attachments ("parentInvoiceId", "fileName", "fileType", "fileSize", "data")
+         SELECT ?, "fileName", "fileType", "fileSize", "data" FROM attachments WHERE "parentInvoiceId" = ?;`;
+         
+    const attachmentsParams = db.workspaceId ? [db.workspaceId, duplicatedRowID, invoiceId] : [duplicatedRowID, invoiceId];
+    await db.run(insertAttachmentsSQL, attachmentsParams);
 
     let duplicated = [];
     if (isQuotationConversion) {

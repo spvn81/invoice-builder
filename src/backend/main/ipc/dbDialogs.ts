@@ -83,31 +83,34 @@ const resetIPCHandlers = () => {
 };
 
 export const initDBDialogsHandlers = (dbName: string, mainWindow: BrowserWindow) => {
+  // Replaced file dialogs with workspace-scoped logic, but we still have get-all-databases
+  
+  // To avoid breaking renderer that might still call these, we just return empty/not-supported or fake it.
+  // The correct fix is in renderer, but we satisfy backend isolation first.
   ipcMain.handle('show-save-db-dialog', async () => {
-    const defaultPath = join(process.env.USERPROFILE || process.cwd(), `${dbName}.db`);
-    const result = await dialog.showSaveDialog({
-      title: 'Select a path and database file name',
-      defaultPath,
-      filters: [{ name: 'SQLite DB', extensions: ['db'] }]
-    });
-    return { success: true, data: { canceled: result.canceled, filePath: result.filePath } };
+    return { success: false, message: 'File dialogs are disabled. Use workspace APIs.' };
   });
   ipcMain.handle('show-open-db-dialog', async () => {
-    const defaultPath = join(process.env.USERPROFILE || process.cwd(), `${dbName}.db`);
-    const result = await dialog.showOpenDialog({
-      title: 'Open existing database file',
-      defaultPath,
-      filters: [{ name: 'SQLite DB', extensions: ['db'] }],
-      properties: ['openFile']
-    });
-    return {
-      success: true,
-      data: {
-        canceled: result.canceled,
-        filePath: Array.isArray(result.filePaths) && result.filePaths.length ? result.filePaths[0] : undefined
-      }
-    };
+    return { success: false, message: 'File dialogs are disabled. Use workspace APIs.' };
   });
+
+  ipcMain.handle('get-all-databases', async () => {
+    try {
+      const { getLocalProfile } = await import('../profile');
+      const fsPromise = await import('fs/promises');
+      const fs = await import('fs');
+      
+      const profileId = getLocalProfile().profileId;
+      const dbDir = join(process.cwd(), process.env.DB_DIRECTORY || 'data', 'users', profileId, 'databases');
+      if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+      const files = await fsPromise.readdir(dbDir);
+      const dbFiles = files.filter(f => f.endsWith('.db') || f.endsWith('.sqlite') || f.endsWith('.sqlite3'));
+      return { success: true, data: dbFiles };
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
   ipcMain.handle('test-connection', async (_event, config?: PostgresConfig & { dbType?: DatabaseType }) => {
     try {
       if (config?.dbType === DatabaseType.mysql) {
@@ -124,14 +127,32 @@ export const initDBDialogsHandlers = (dbName: string, mainWindow: BrowserWindow)
     'initialize-db',
     async (
       _event,
-      opts: { fullPath?: string; dbType: DatabaseType; mode?: DBInitType; postgresConfig?: PostgresConfig; mysqlConfig?: MySqlConfig }
+      opts: { filename?: string; fullPath?: string; dbType: DatabaseType; mode?: DBInitType; postgresConfig?: PostgresConfig; mysqlConfig?: MySqlConfig }
     ) => {
       try {
         resetIPCHandlers();
         const createIfMissing = opts.mode === DBInitType.create || typeof opts.mode === 'undefined';
+        
+        let finalPath: string | undefined = undefined;
+        
+        const { getLocalProfile } = await import('../profile');
+        const profileId = getLocalProfile().profileId;
+        
+        // Ensure path safety by only trusting filename
+        if (opts.dbType === DatabaseType.sqlite) {
+          const name = opts.filename || (opts.fullPath ? require('path').basename(opts.fullPath) : '');
+          if (!name || name.includes('..') || require('path').isAbsolute(name) || name.includes('/') || name.includes('\\')) {
+            return { success: false, key: 'error.invalidDBName' };
+          }
+          
+          const userDbDir = join(process.cwd(), process.env.DB_DIRECTORY || 'data', 'users', profileId, 'databases');
+          if (!require('fs').existsSync(userDbDir)) require('fs').mkdirSync(userDbDir, { recursive: true });
+          finalPath = join(userDbDir, name);
+        }
 
         await setupDB({
-          sqliteConfig: { fullPath: opts.fullPath },
+          workspaceId: profileId,
+          sqliteConfig: { fullPath: finalPath },
           dbType: opts.dbType,
           createIfMissing,
           mainWindow,

@@ -18,6 +18,7 @@ import { addInvoice, duplicateInvoice, getNextSequence, updateInvoice } from '..
 const createTestDatabase = async (): Promise<DatabaseAdapter> => {
   const sqlite = new sqlite3.Database(':memory:');
   const db = createSqliteAdapter(sqlite);
+  db.workspaceId = 'test-workspace-id';
   await initSchema(db);
   await runMigrations(db, path.resolve(__dirname, '../../../../../dist-be/backend/migrations'));
   await initInitialData(db);

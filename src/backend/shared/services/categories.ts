@@ -65,7 +65,7 @@ export const updateCategory = async (db: DatabaseAdapter, data: Category) => {
 
 export const deleteCategory = async (db: DatabaseAdapter, id: number) => {
   try {
-    await db.run('DELETE FROM categories WHERE "id" = ?;', [id]);
+    await deleteEntity(db, 'categories', id);
     return { success: true };
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };

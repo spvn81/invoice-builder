@@ -3,7 +3,7 @@ import { type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { FilterType } from '../../shared/enums/filterType';
 import type { FilterData } from '../../shared/types/invoiceFilter';
-import { dbInstance } from '../database';
+// Removed dbInstance import
 
 export const parseFilter = (query: string | undefined): FilterData[] | undefined => {
   if (!query) return undefined;
@@ -35,15 +35,30 @@ export const parseFilter = (query: string | undefined): FilterData[] | undefined
   return result.length ? result : undefined;
 };
 
-export const requireDB = (_req: Request, res: Response, next: NextFunction) => {
-  if (!dbInstance) {
+import { getDbForWorkspace } from '../database';
+import { type AuthRequest } from '../middlewares/authMiddleware';
+
+export const requireDB = (req: Request, res: Response, next: NextFunction) => {
+  const authReq = req as AuthRequest;
+  if (!authReq.user || !authReq.user.workspaceId) {
+    return res.status(401).json({
+      success: false,
+      message: undefined,
+      key: 'error.unauthenticated'
+    });
+  }
+
+  try {
+    // This will throw if the database isn't initialized for the workspace
+    getDbForWorkspace(authReq.user.workspaceId);
+    next();
+  } catch (err) {
     return res.status(400).json({
       success: false,
       message: undefined,
       key: 'error.databaseNotInitialized'
     });
   }
-  next();
 };
 
 export const listDbLimiter = rateLimit({

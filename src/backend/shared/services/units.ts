@@ -65,7 +65,7 @@ export const updateUnit = async (db: DatabaseAdapter, data: Unit) => {
 
 export const deleteUnit = async (db: DatabaseAdapter, id: number) => {
   try {
-    await db.run('DELETE FROM units WHERE "id" = ?;', [id]);
+    await deleteEntity(db, 'units', id);
     return { success: true };
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };

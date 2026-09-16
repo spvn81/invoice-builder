@@ -75,7 +75,7 @@ export const updateClient = async (db: DatabaseAdapter, data: Client): Promise<R
 
 export const deleteClient = async (db: DatabaseAdapter, id: number) => {
   try {
-    await db.run('DELETE FROM clients WHERE "id" = ?;', [id]);
+    await deleteEntity(db, 'clients', id);
     return { success: true };
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };

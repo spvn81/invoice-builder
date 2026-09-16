@@ -66,7 +66,7 @@ export const updateCurrency = async (
 
 export const deleteCurrency = async (db: DatabaseAdapter, id: number) => {
   try {
-    await db.run('DELETE FROM currencies WHERE id = ?;', [id]);
+    await deleteEntity(db, 'currencies', id);
     return { success: true };
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };

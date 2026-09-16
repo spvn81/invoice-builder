@@ -28,14 +28,38 @@ import { store } from './state/configureStore';
 
 const mockEnabled = import.meta.env.VITE_ENABLE_MOCKS;
 
+import { ProtectedRoute } from './app/ProtectedRoute';
+import { HomePage } from './pages/home';
+import { LoginPage } from './pages/auth/Login';
+import { RegisterPage } from './pages/auth/Register';
+import { VerifyPage } from './pages/auth/Verify';
+
 const createRouter = () => {
   const routes = [
     {
+      path: '/home',
+      element: <HomePage />
+    },
+    {
+      path: '/login',
+      element: <LoginPage />
+    },
+    {
+      path: '/register',
+      element: <RegisterPage />
+    },
+    {
+      path: '/verify-email',
+      element: <VerifyPage />
+    },
+    {
       path: '/',
       element: (
-        <ThemeProviderWrapper>
-          <App />
-        </ThemeProviderWrapper>
+        <ProtectedRoute>
+          <ThemeProviderWrapper>
+            <App />
+          </ThemeProviderWrapper>
+        </ProtectedRoute>
       ),
       children: [
         { index: true, element: <Navigate to="/invoices" replace /> },

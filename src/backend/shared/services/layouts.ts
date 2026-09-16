@@ -50,7 +50,7 @@ export const updateLayout = async (db: DatabaseAdapter, data: Layout) => {
 };
 export const deleteLayout = async (db: DatabaseAdapter, id: number) => {
   try {
-    await db.run('DELETE FROM layouts WHERE "id" = ?', [id]);
+    await deleteEntity(db, 'layouts', id);
     return { success: true };
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };

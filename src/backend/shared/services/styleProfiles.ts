@@ -148,7 +148,7 @@ export const updateStyleProfile = async (
 
 export const deleteStyleProfile = async (db: DatabaseAdapter, id: number) => {
   try {
-    await db.run('DELETE FROM style_profiles WHERE "id" = ?;', [id]);
+    await deleteEntity(db, 'style_profiles', id);
     return { success: true };
   } catch (error) {
     return { success: false, ...mapDatabaseError(error, db.type) };

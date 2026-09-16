@@ -13,13 +13,14 @@ let dbInstance: DatabaseAdapter | null = null;
 
 const setupDB = async (opts: {
   dbType: DatabaseType;
+  workspaceId?: string;
   createIfMissing?: boolean;
   postgresConfig?: PostgresConfig;
   sqliteConfig?: SqLiteConfig;
   mysqlConfig?: MySqlConfig;
   mainWindow: BrowserWindow;
 }) => {
-  const { sqliteConfig, createIfMissing = true, mainWindow, dbType, postgresConfig, mysqlConfig } = opts;
+  const { sqliteConfig, createIfMissing = true, mainWindow, dbType, postgresConfig, mysqlConfig, workspaceId } = opts;
 
   if (dbInstance) {
     await (dbInstance as DatabaseAdapter).close();
@@ -40,6 +41,8 @@ const setupDB = async (opts: {
   }
 
   if (!dbInstance) throw new Error('error.noDatabase');
+
+  dbInstance.workspaceId = workspaceId;
 
   if (createIfMissing) {
     await initSchema(dbInstance);
