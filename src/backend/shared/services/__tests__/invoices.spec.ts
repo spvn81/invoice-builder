@@ -176,7 +176,13 @@ describe('invoice sequence handling', () => {
     expect(originalInvoice.id).toBeDefined();
 
     const result = await duplicateInvoice(db, originalInvoice.id as number, InvoiceType.invoice);
-
+    
+    if (!result.success) {
+      const allInvoices = await db.all('SELECT "id", "workspace_id", "invoiceNumber" FROM invoices');
+      console.log('ALL INVOICES IN DB:', allInvoices);
+      console.log('ORIGINAL INVOICE:', originalInvoice);
+    }
+    
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();
 
@@ -319,6 +325,7 @@ describe('invoice sequence handling', () => {
       ...invoice,
       customerNotes: 'Updated note'
     });
+    if (!updateResult.success) console.error('TEST FAIL 1:', updateResult);
     expect(updateResult.success).toBe(true);
 
     const sequenceAfterUpdate = await getNextSequence(db, {
@@ -345,6 +352,7 @@ describe('invoice sequence handling', () => {
       ...invoice,
       invoiceNumber: '000010'
     });
+    if (!updateResult.success) console.error('TEST FAIL 2:', updateResult);
     expect(updateResult.success).toBe(true);
 
     const sequenceAfterUpdate = await getNextSequence(db, {

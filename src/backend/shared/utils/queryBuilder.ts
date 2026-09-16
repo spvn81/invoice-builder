@@ -5,11 +5,9 @@ export class TenantQueryBuilder {
   constructor(private db: DatabaseAdapter) {}
 
   private get requiresWorkspaceScoping() {
-     // Even SQLite is workspace-scoped now in terms of the adapter having a workspaceId,
-     // but physically SQLite databases are separate per user.
-     // If we add workspace_id to all tables, we can scope all databases.
-     // The user requested adding it to ALL tenant-owned tables and scoping uniformly.
-     return true; 
+     // Local SQLite databases are physically isolated per user and do not require workspace_id columns
+     // Shared databases (MySQL/PostgreSQL) require workspace_id row-level isolation
+     return this.db.type !== DatabaseType.sqlite; 
   }
 
   async deleteById(table: string, id: number | string): Promise<void> {

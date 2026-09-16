@@ -56,7 +56,9 @@ export const setupDB = async (opts: {
 
   if (!newDb) throw new Error('error.noDatabase');
 
-  newDb.workspaceId = workspaceId;
+  if (dbType !== DatabaseType.sqlite) {
+    newDb.workspaceId = workspaceId;
+  }
 
   if (createIfMissing) {
     await initSchema(newDb);

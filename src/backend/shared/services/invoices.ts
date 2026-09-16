@@ -196,6 +196,9 @@ const handleEntity =
   async (data: T, isUpdate = false): Promise<Response<number>> => {
     const params = fields.map(key => (data[key] ?? null) as string | number | null);
 
+    const finalFields = db.workspaceId ? [...fields, 'workspace_id'] : [...fields];
+    const finalParams = db.workspaceId ? [...params, db.workspaceId] : [...params];
+
     try {
       let lastID: number = -1;
 
@@ -204,19 +207,25 @@ const handleEntity =
           fields.map(f => `"${String(f)}" = ?`).join(', ') +
           `, "updatedAt" = ${getDefaultValue("(datetime('now'))", db.type)}`;
 
-        await db.run(`UPDATE ${table} SET ${setClause} WHERE "id" = ?`, [...params, data.id ?? -1], true);
+        if (db.workspaceId) {
+          await db.run(`UPDATE ${table} SET ${setClause} WHERE "id" = ? AND "workspace_id" = ?`, [...params, data.id ?? -1, db.workspaceId], true);
+        } else {
+          await db.run(`UPDATE ${table} SET ${setClause} WHERE "id" = ?`, [...params, data.id ?? -1], true);
+        }
+        
         lastID = data.id ?? -1;
       } else {
         lastID = await db.run(
-          `INSERT INTO ${table} (${fields.map(f => `"${String(f)}"`).join(',')})
-           VALUES (${fields.map(() => '?').join(',')})`,
-          params,
+          `INSERT INTO ${table} (${finalFields.map(f => `"${String(f)}"`).join(',')})
+           VALUES (${finalFields.map(() => '?').join(',')})`,
+          finalParams,
           true
         );
       }
 
       return { success: true, data: lastID };
     } catch (error) {
+      console.error('handleEntity error:', error, 'table:', table, 'finalFields:', finalFields, 'finalParams:', finalParams);
       return { success: false, ...mapDatabaseError(error, db.type) };
     }
   };
@@ -226,6 +235,14 @@ const rollbackOrThrow = async (db: DatabaseAdapter) => {
     await db.run('ROLLBACK');
   } catch {
     throw new Error(`error.rollbackFailed`);
+  }
+};
+
+const deleteBy = async (db: DatabaseAdapter, table: string, column: string, value: string | number) => {
+  if (db.workspaceId) {
+    await db.run(`DELETE FROM ${table} WHERE "${column}" = ? AND "workspace_id" = ?`, [value, db.workspaceId], true);
+  } else {
+    await db.run(`DELETE FROM ${table} WHERE "${column}" = ?`, [value], true);
   }
 };
 
@@ -651,7 +668,7 @@ const getDuplicateInvoiceNumber = async (
   return { success: true, data: formatSequenceWithWidth(sequenceData.nextSequence, sequenceData.paddingWidth) };
 };
 
-const getInvoices = async (db: DatabaseAdapter, options: GetInvoicesOptions) => {
+export const getInvoices = async (db: DatabaseAdapter, options: GetInvoicesOptions) => {
   const { id, type, filter } = options;
 
   const whereClause = filter
@@ -1036,7 +1053,10 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
   try {
     await db.run('BEGIN');
 
-    const currentInvoice = await db.get<Invoice>(`SELECT * FROM invoices WHERE "id" = ?`, [data.id]);
+    const sqlParams = db.workspaceId ? [data.id, db.workspaceId] : [data.id];
+    const sqlWhere = db.workspaceId ? `WHERE "id" = ? AND "workspace_id" = ?` : `WHERE "id" = ?`;
+    const currentInvoice = await db.get<Invoice>(`SELECT * FROM invoices ${sqlWhere}`, sqlParams);
+    
     if (!currentInvoice) {
       await rollbackOrThrow(db);
       return { success: false, key: 'error.invoiceNotFound' };
@@ -1229,9 +1249,14 @@ export const duplicateInvoice = async (
   try {
     await db.run('BEGIN');
 
-    const original = await db.get('SELECT * FROM invoices WHERE "id" = ?;', [invoiceId]);
+    const sqlParams = db.workspaceId ? [invoiceId, db.workspaceId] : [invoiceId];
+    const sqlWhere = db.workspaceId ? `WHERE "id" = ? AND "workspace_id" = ?` : `WHERE "id" = ?`;
+    const original = await db.get(`SELECT * FROM invoices ${sqlWhere};`, sqlParams);
 
-    if (!original) return { success: false };
+    if (!original) {
+      console.error('duplicateInvoice error: !original, id:', invoiceId, 'workspace:', db.workspaceId);
+      return { success: false };
+    }
 
     const businessId = Number(original.businessId);
     const clientId = Number(original.clientId);
@@ -1258,6 +1283,7 @@ export const duplicateInvoice = async (
       targetInvoiceType: invoiceType as InvoiceType
     });
     if (!numberResult.success || numberResult.data === undefined) {
+      console.error('duplicateInvoice error: !numberResult.success', numberResult);
       await rollbackOrThrow(db);
       return { success: false };
     }
@@ -1462,15 +1488,19 @@ export const duplicateInvoice = async (
     const attachmentsParams = db.workspaceId ? [db.workspaceId, duplicatedRowID, invoiceId] : [duplicatedRowID, invoiceId];
     await db.run(insertAttachmentsSQL, attachmentsParams);
 
-    let duplicated = [];
+    let duplicated: any = [];
     if (isQuotationConversion) {
-      duplicated = await getInvoices(db, { id: original.id as number });
+      const res = await getInvoices(db, { id: original.id as number });
+      duplicated = res;
     } else {
-      duplicated = await getInvoices(db, { id: duplicatedRowID });
+      const res = await getInvoices(db, { id: duplicatedRowID });
+      duplicated = res;
     }
+
     await db.run('COMMIT');
-    return { success: true, data: duplicated.length > 0 ? duplicated[0] : duplicated };
+    return { success: true, data: duplicated && duplicated.length > 0 ? duplicated[0] : duplicated };
   } catch (error) {
+    console.error('duplicateInvoice error:', error);
     await rollbackOrThrow(db);
     return { success: false, ...mapDatabaseError(error, db.type) };
   }
