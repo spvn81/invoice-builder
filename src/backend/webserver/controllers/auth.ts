@@ -101,7 +101,7 @@ export const initAuthController = (app: Express) => {
         return;
       }
 
-      const user = userRes.rows[0];
+      const user = userRes.rows[0] as any;
       const now = new Date();
       if (!user.verification_token_expires_at || new Date(user.verification_token_expires_at) < now) {
         res.status(400).json({ success: false, message: 'error.tokenExpired' });
@@ -172,7 +172,7 @@ export const initAuthController = (app: Express) => {
         return;
       }
       
-      const user = userRes.rows[0];
+      const user = userRes.rows[0] as any;
       const token = crypto.randomBytes(32).toString('hex');
       const tokenHash = await bcrypt.hash(token, 10);
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -210,7 +210,7 @@ export const initAuthController = (app: Express) => {
         return;
       }
 
-      const user = userRes.rows[0];
+      const user = userRes.rows[0] as any;
       if (user.status !== 'active') {
         res.status(401).json({ success: false, message: 'error.accountNotActive' });
         return;
@@ -225,7 +225,7 @@ export const initAuthController = (app: Express) => {
       // Initialize the default database into the runtime Map if sqlite
       const dbRes = await db.query('SELECT * FROM user_databases WHERE user_id = ? AND is_default = 1', [user.id]);
       if (dbRes.rows && dbRes.rows.length > 0) {
-         const defaultDb = dbRes.rows[0];
+         const defaultDb = dbRes.rows[0] as any;
          if (defaultDb.database_type === DatabaseType.sqlite) {
            await setupDB({
              workspaceId: user.default_workspace_id,
@@ -263,7 +263,7 @@ export const initAuthController = (app: Express) => {
         res.status(401).json({ success: false, message: 'error.invalidSession' });
         return;
       }
-      const user = userRes.rows[0];
+      const user = userRes.rows[0] as any;
       res.json({
         success: true,
         data: {

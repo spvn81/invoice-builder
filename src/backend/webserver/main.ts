@@ -33,6 +33,7 @@ const main = async () => {
     const { setupDB } = await import('./database');
     const { DatabaseType } = await import('../shared/enums/databaseType');
     await setupDB({
+      workspaceId: 'system',
       dbType: DatabaseType.mysql,
       mysqlConfig: {
         host: process.env.MYSQL_HOST || '127.0.0.1',

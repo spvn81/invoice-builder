@@ -2,6 +2,7 @@ import type { Response } from '../../shared/types/response';
 import type { EInvoice } from '../enums/einvoice';
 import { InvoiceStatus } from '../enums/invoiceStatus';
 import { InvoiceType } from '../enums/invoiceType';
+import { deleteEntity } from '../utils/entitiesFunctions';
 import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { EntityWithId } from '../types/entityWithId';
 import type {

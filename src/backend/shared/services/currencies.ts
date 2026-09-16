@@ -3,7 +3,7 @@ import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { EntityWithCounts } from '../types/entityWithCounts';
 import type { FilterData } from '../types/invoiceFilter';
 import type { Response } from '../types/response';
-import { getAllEntities, handleEntity } from '../utils/entitiesFunctions';
+import { getAllEntities, handleEntity, deleteEntity } from '../utils/entitiesFunctions';
 import { mapDatabaseError } from '../utils/errorFunctions';
 
 const currencyFields: (keyof Currency)[] = ['code', 'symbol', 'text', 'format', 'isArchived', 'subunit'];

@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { FilterData } from '../types/invoiceFilter';
 import type { Unit } from '../types/unit';
-import { getAllEntities, handleEntity } from '../utils/entitiesFunctions';
+import { getAllEntities, handleEntity, deleteEntity } from '../utils/entitiesFunctions';
 import { mapDatabaseError } from '../utils/errorFunctions';
 
 const unitFields: (keyof Unit)[] = ['name', 'isArchived'];

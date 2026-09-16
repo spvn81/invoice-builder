@@ -1,6 +1,7 @@
 import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { EntityWithId } from '../types/entityWithId';
 import type { FilterData } from '../types/invoiceFilter';
+import { deleteEntity } from '../utils/entitiesFunctions';
 import type { Preset } from '../types/preset';
 import type { Response } from '../types/response';
 import { getDefaultValue } from '../utils/dbHelper';

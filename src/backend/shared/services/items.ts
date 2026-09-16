@@ -1,3 +1,4 @@
+import { deleteEntity } from '../utils/entitiesFunctions';
 import type { Response } from '../../shared/types/response';
 import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { EntityWithCounts } from '../types/entityWithCounts';

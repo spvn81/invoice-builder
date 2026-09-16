@@ -44,7 +44,7 @@ export const initDatabaseController = (app: Express) => {
     }
   });
   
-  app.get('/api/databases/legacy', authMiddleware, async (req: Request, res: Response) => {
+  app.get('/api/databases/legacy', authMiddleware, async (_req: Request, res: Response) => {
     try {
       if (!fs.existsSync(dbDir)) {
         return res.json({ success: true, data: [] });
@@ -161,7 +161,7 @@ export const initDatabaseController = (app: Express) => {
         const dbId = uuidv4();
         // Determine is_default: if no DBs exist, make it default, else 0
         const allUserDbs = await systemDb.query('SELECT count(*) as cnt FROM user_databases WHERE user_id = ?', [userId]);
-        const isDefault = allUserDbs.rows && allUserDbs.rows[0].cnt === 0 ? 1 : 0;
+        const isDefault = allUserDbs.rows && (allUserDbs.rows[0] as any).cnt === 0 ? 1 : 0;
         
         await systemDb.run(`INSERT INTO user_databases (id, user_id, workspace_id, database_name, database_path, database_type, is_default) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
            dbId, userId, workspaceId, name, dbType === DatabaseType.sqlite ? fullPath : '', dbType, isDefault

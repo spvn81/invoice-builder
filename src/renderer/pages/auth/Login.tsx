@@ -42,7 +42,7 @@ export const LoginPage: FC = () => {
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', bgcolor: 'grey.100' }}>
       <Container maxWidth="xs">
         <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
-          <Typography variant="h5" component="h1" gutterBottom fontWeight="bold" textAlign="center">
+          <Typography variant="h5" component="h1" gutterBottom fontWeight="bold" align="center">
             Sign In
           </Typography>
           

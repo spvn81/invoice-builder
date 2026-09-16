@@ -68,11 +68,11 @@ export const VerifyPage: FC = () => {
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', bgcolor: 'grey.100' }}>
       <Container maxWidth="xs">
         <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
-          <Typography variant="h5" component="h1" gutterBottom fontWeight="bold" textAlign="center">
+          <Typography variant="h5" component="h1" gutterBottom fontWeight="bold" align="center">
             Verify Email
           </Typography>
           
-          <Typography variant="body2" color="text.secondary" paragraph textAlign="center">
+          <Typography variant="body2" color="text.secondary" paragraph align="center">
             Enter the verification token sent to your email address.
           </Typography>
           

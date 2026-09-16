@@ -3,7 +3,7 @@ import type { EntityWithCounts } from '../types/entityWithCounts';
 import type { FilterData } from '../types/invoiceFilter';
 import type { Response } from '../types/response';
 import type { StyleProfile } from '../types/styleProfiles';
-import { getAllEntities, handleEntity } from '../utils/entitiesFunctions';
+import { getAllEntities, handleEntity, deleteEntity } from '../utils/entitiesFunctions';
 import { mapDatabaseError } from '../utils/errorFunctions';
 
 const styleProfileFields: (keyof StyleProfile)[] = [
