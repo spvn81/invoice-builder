@@ -327,18 +327,18 @@
   },
   "databaseChooser": {
     "connect": "Se connecter à la base de données",
-    "createNew": "Créer une nouvelle base de données",
-    "description": "Choisissez une base existante ou créez-en une nouvelle. Vous pouvez mémoriser les bases fréquemment utilisées pour un accès rapide.",
+    "createNew": "Create New Local Workspace",
+    "description": "Choose an existing workspace or create a new one.",
     "descriptionServer": "Configurez une connexion à une base de données et créez-en une nouvelle, ou ouvrez rapidement une base de données existante depuis votre liste récente en utilisant les paramètres de connexion enregistrés.",
-    "descriptionWeb": "Créez une nouvelle base de données ou ouvrez-en une depuis votre liste récemment utilisée pour un accès rapide.",
+    "descriptionWeb": "Choose an existing workspace or create a new one.",
     "local": "Local",
     "localDesc": "Les données sont stockées localement sur votre appareil (SQLite). Aucune connexion Internet requise.",
     "openExisting": "Ouvrir une base existante",
     "server": "Serveur",
     "serverDesc": "Les données sont stockées sur un serveur (PostgreSQL). Une connexion Internet est requise si le serveur est distant.",
-    "title": "Ouvrir ou créer une base de données",
+    "title": "My Local Workspaces / Databases",
     "titleServer": "Configurer la connexion et créer une base de données",
-    "titleWeb": "Créer une base de données"
+    "titleWeb": "My Local Workspaces / Databases"
   },
   "error": {
     "connectionFailed": "Connexion échouée",

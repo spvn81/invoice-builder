@@ -3,6 +3,7 @@ import { Box, Button, Container, Typography, Paper, TextField, Alert } from '@mu
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch } from '../../state/configureStore';
 import { setAuth } from '../../state/authSlice';
+import { setDbReady } from '../../state/pageSlice';
 
 export const LoginPage: FC = () => {
   const navigate = useNavigate();
@@ -27,11 +28,10 @@ export const LoginPage: FC = () => {
       
       if (data.success) {
          dispatch(setAuth(data.data));
-         if (data.data.databaseSelectionRequired) {
-             navigate('/select-database');
-         } else {
-             navigate('/invoices');
+         if (!data.data.databaseCreationRequired && !data.data.databaseSelectionRequired) {
+             dispatch(setDbReady(true));
          }
+         // GuestRoute will handle the redirect based on the updated Redux state
       } else {
          setError(data.message || 'Login failed');
       }

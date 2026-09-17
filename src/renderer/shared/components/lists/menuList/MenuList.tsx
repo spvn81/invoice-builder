@@ -57,6 +57,7 @@ export const MenuList: FC<Props> = ({ items, showText, useTooltip }) => {
   const renderItem = (item: MenuItem) => {
     const listButton = (
       <ListItemButton
+        data-testid={`menu-item-${item.text?.replace(/\s+/g, '-').toLowerCase()}`}
         selected={typeof item.isSelected === 'function' ? item.isSelected(item) : item.isSelected}
         onClick={() => {
           if (item.isToggle && item.onChange) item.onChange(item);

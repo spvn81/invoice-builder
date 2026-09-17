@@ -327,18 +327,18 @@
   },
   "databaseChooser": {
     "connect": "Mit Datenbank verbinden",
-    "createNew": "Neue Datenbank erstellen",
-    "description": "Wählen Sie eine vorhandene Datenbank oder erstellen Sie eine neue. Sie können häufig verwendete Datenbanken für schnellen Zugriff speichern.",
+    "createNew": "Create New Local Workspace",
+    "description": "Choose an existing workspace or create a new one.",
     "descriptionServer": "Stellen Sie eine Verbindung zu einer Datenbank her und erstellen Sie eine neue, oder öffnen Sie schnell eine vorhandene Datenbank aus Ihrer letzten Liste unter Verwendung der gespeicherten Verbindungseinstellungen.",
-    "descriptionWeb": "Erstellen Sie eine neue Datenbank oder öffnen Sie eine aus Ihrer Liste der zuletzt verwendeten für einen schnellen Zugriff.",
+    "descriptionWeb": "Choose an existing workspace or create a new one.",
     "local": "Lokal",
     "localDesc": "Daten werden lokal auf Ihrem Gerät gespeichert (SQLite). Keine Internetverbindung erforderlich.",
     "openExisting": "Vorhandene Datenbank öffnen",
     "server": "Server",
     "serverDesc": "Daten werden auf einem Server gespeichert (PostgreSQL). Eine Internetverbindung ist erforderlich, wenn der Server remote ist.",
-    "title": "Datenbank öffnen oder erstellen",
+    "title": "My Local Workspaces / Databases",
     "titleServer": "Verbindung einrichten und Datenbank erstellen",
-    "titleWeb": "Datenbank erstellen"
+    "titleWeb": "My Local Workspaces / Databases"
   },
   "error": {
     "connectionFailed": "Verbindung fehlgeschlagen",

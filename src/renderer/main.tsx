@@ -29,29 +29,47 @@ import { store } from './state/configureStore';
 const mockEnabled = import.meta.env.VITE_ENABLE_MOCKS;
 
 import { ProtectedRoute } from './app/ProtectedRoute';
+import { GuestRoute } from './app/GuestRoute';
 import { HomePage } from './pages/home';
 import { LoginPage } from './pages/auth/Login';
 import { RegisterPage } from './pages/auth/Register';
 import { VerifyPage } from './pages/auth/Verify';
 import { DatabaseSelectorPage } from './pages/auth/DatabaseSelector';
+import { CreateDatabase } from './pages/auth/CreateDatabase';
 
 const createRouter = () => {
   const routes = [
     {
       path: '/home',
-      element: <HomePage />
+      element: (
+        <GuestRoute>
+          <HomePage />
+        </GuestRoute>
+      )
     },
     {
       path: '/login',
-      element: <LoginPage />
+      element: (
+        <GuestRoute>
+          <LoginPage />
+        </GuestRoute>
+      )
     },
     {
       path: '/register',
-      element: <RegisterPage />
+      element: (
+        <GuestRoute>
+          <RegisterPage />
+        </GuestRoute>
+      )
     },
     {
       path: '/verify-email',
-      element: <VerifyPage />
+      element: (
+        <GuestRoute>
+          <VerifyPage />
+        </GuestRoute>
+      )
     },
     {
       path: '/select-database',
@@ -59,6 +77,16 @@ const createRouter = () => {
         <ProtectedRoute>
           <ThemeProviderWrapper>
             <DatabaseSelectorPage />
+          </ThemeProviderWrapper>
+        </ProtectedRoute>
+      )
+    },
+    {
+      path: '/create-database',
+      element: (
+        <ProtectedRoute>
+          <ThemeProviderWrapper>
+            <CreateDatabase />
           </ThemeProviderWrapper>
         </ProtectedRoute>
       )

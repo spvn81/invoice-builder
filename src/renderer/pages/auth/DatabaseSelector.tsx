@@ -2,6 +2,7 @@ import { useEffect, useState, type FC } from 'react';
 import { Box, Button, Container, Typography, Paper, Alert, List, ListItem, ListItemText, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch } from '../../state/configureStore';
+import { setDbReady } from '../../state/pageSlice';
 
 interface DatabaseMetadata {
   id: string;
@@ -13,6 +14,7 @@ interface DatabaseMetadata {
 
 export const DatabaseSelectorPage: FC = () => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const [databases, setDatabases] = useState<DatabaseMetadata[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -49,6 +51,7 @@ export const DatabaseSelectorPage: FC = () => {
       });
       const data = await res.json();
       if (data.success) {
+        dispatch(setDbReady(true));
         navigate('/invoices');
       } else {
         setError(data.message || 'Failed to open database');

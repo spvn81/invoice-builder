@@ -327,18 +327,18 @@
   },
   "databaseChooser": {
     "connect": "Connect to Database",
-    "createNew": "Create new database",
-    "description": "Choose an existing database or create a new one. You can remember frequently used databases for quick access.",
+    "createNew": "Create New Local Workspace",
+    "description": "Choose an existing workspace or create a new one.",
     "descriptionServer": "Set up a connection to a database and create a new one, or quickly open an existing database from your recent list using saved connection settings.",
-    "descriptionWeb": "Create a new database, or open an existing one from your recently used list for quick access.",
+    "descriptionWeb": "Choose an existing workspace or create a new one.",
     "local": "Local",
     "localDesc": "Data is stored locally on your device (SQLite). No internet required.",
     "openExisting": "Open existing database",
     "server": "Server",
     "serverDesc": "Data is stored on a server (PostgreSQL). Requires an internet connection if the server is remote.",
-    "title": "Open or create a database",
+    "title": "My Local Workspaces / Databases",
     "titleServer": "Set up connection and create a database",
-    "titleWeb": "Create a database"
+    "titleWeb": "My Local Workspaces / Databases"
   },
   "error": {
     "connectionFailed": "Connection failed",

@@ -327,18 +327,18 @@
   },
   "databaseChooser": {
     "connect": "Prisijungti prie duomenų bazės",
-    "createNew": "Sukurti duomenų bazę",
-    "description": "Pasirinkite esamą duomenų bazę arba sukurkite naują. Galite išsaugoti dažnai naudojamas duomenų bazes greitam priėjimui.",
+    "createNew": "Create New Local Workspace",
+    "description": "Choose an existing workspace or create a new one.",
     "descriptionServer": "Sukurkite ryšį su duomenų baze ir sukurkite naują duomenų bazę, arba greitai atidarykite esamą duomenų bazę iš neseniai naudotų sąrašo.",
-    "descriptionWeb": "Sukurkite naują duomenų bazę arba greitai atverkite jau naudotą iš neseniai naudotų sąrašo.",
+    "descriptionWeb": "Choose an existing workspace or create a new one.",
     "local": "Vietinis",
     "localDesc": "Duomenys saugomi jūsų įrenginyje (SQLite). Internetas nereikalingas.",
     "openExisting": "Atidaryti duomenų bazę",
     "server": "Serveris",
     "serverDesc": "Duomenys saugomi serveryje (PostgreSQL). Reikalingas interneto ryšys, jei serveris yra nuotolinis.",
-    "title": "Atidaryti arba sukurti duomenų bazę",
+    "title": "My Local Workspaces / Databases",
     "titleServer": "Sukurkite ryšį ir duomenų bazę",
-    "titleWeb": "Sukurti duomenų bazę"
+    "titleWeb": "My Local Workspaces / Databases"
   },
   "error": {
     "connectionFailed": "Nepavyko prisijungti",

@@ -2,7 +2,6 @@ import CloseIcon from '@mui/icons-material/Close';
 import {
   Box,
   Button,
-  Divider,
   IconButton,
   ListItemButton,
   ListItemText,
@@ -35,14 +34,14 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
   const theme = useTheme();
   const { t } = useTranslation();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [savedDbs, setSavedDbs] = useState<string[]>([]);
+  const [savedDbs, setSavedDbs] = useState<any[]>([]);
   const [selectionMode, setSelectionMode] = useState<DBInitType | undefined>(undefined);
   const [isInitializing, setIsInitializing] = useState(false);
   const [isDBSetterModalOpen, setIsDBSetterModalOpen] = useState(false);
 
   const { execute: getDBList } = useDBListSelector({
     immediate: false,
-    onDone: (results: Response<string[]>) => {
+    onDone: (results: Response<any[]>) => {
       if (results.data) {
         setSavedDbs(results.data);
       }
@@ -89,11 +88,17 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
   });
 
   const saveDbList = useCallback(
-    (list: string[]) => {
-      const sortedList = [...list].sort((a, b) => a.localeCompare(b));
+    (list: any[]) => {
+      const sortedList = [...list].sort((a, b) => {
+        const aName = typeof a === 'string' ? a : (a.name || '');
+        const bName = typeof b === 'string' ? b : (b.name || '');
+        return aName.localeCompare(bName);
+      });
       setSavedDbs(sortedList);
       try {
-        localStorage.setItem('databases', JSON.stringify(sortedList));
+        if (!isWebMode()) {
+          localStorage.setItem('databases', JSON.stringify(sortedList));
+        }
       } catch {
         dispatch(addToast({ message: t('error.failedToSave'), severity: 'error' }));
       }
@@ -128,7 +133,10 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
     saveDbList(updated);
   };
 
-  const getFileName = (fullPath: string) => fullPath.split(/[/\\]/).pop() ?? fullPath;
+  const getFileName = (fullPath: any) => {
+    if (typeof fullPath === 'string') return fullPath.split(/[/\\]/).pop() ?? fullPath;
+    return fullPath?.name || 'Unknown';
+  };
 
   useEffect(() => {
     if (selectedPath && selectionMode) handleOpenSaved(selectedPath);
@@ -138,8 +146,8 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
   useEffect(() => {
     try {
       const raw = localStorage.getItem('databases');
-      if (raw) {
-        setSavedDbs(JSON.parse(raw) as string[]);
+      if (raw && !isWebMode()) {
+        setSavedDbs(JSON.parse(raw) as any[]);
       }
 
       const lastUsedLanguage = localStorage.getItem('lastUsedLanguage');
@@ -254,9 +262,12 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
             width: '100%'
           }}
         >
-          {savedDbs.map(item => (
+          {savedDbs.map(item => {
+            const itemKey = typeof item === 'string' ? item : (item.id || item.name);
+            const itemName = typeof item === 'string' ? item : item.name;
+            return (
             <Paper
-              key={item}
+              key={itemKey}
               elevation={2}
               sx={{
                 borderRadius: 1,
@@ -272,7 +283,7 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
               <ListItemButton
                 onClick={() => {
                   setSelectionMode(DBInitType.open);
-                  setSelectedPath(item);
+                  setSelectedPath(itemName);
                 }}
                 sx={{
                   pt: 2,
@@ -324,7 +335,7 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
                           wordBreak: 'break-all'
                         }}
                       >
-                        {item}
+                        {itemName}
                       </Typography>
                     }
                   />
@@ -335,7 +346,7 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
                     <IconButton
                       onClick={e => {
                         e.stopPropagation();
-                        handleForget(item.database_name ?? item);
+                        handleForget(itemName);
                       }}
                       sx={{
                         color: theme.palette.error.main,
@@ -354,7 +365,7 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
                     <IconButton
                       onClick={e => {
                         e.stopPropagation();
-                        handleForget(item);
+                        handleForget(itemName);
                       }}
                       sx={{
                         color: theme.palette.error.main,
@@ -370,7 +381,7 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
                 )}
               </ListItemButton>
             </Paper>
-          ))}
+          )})}
         </Box>
       )}
 
@@ -379,7 +390,7 @@ export const LocalDatabase: FC<Props> = ({ onDatabaseRead }) => {
           <Typography variant="h6" color="warning.main" gutterBottom>
             Legacy Databases Detected
           </Typography>
-          <Typography variant="body2" color="text.secondary" paragraph>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             We found some older databases on the server. Import them to your workspace to use them.
           </Typography>
           <Box

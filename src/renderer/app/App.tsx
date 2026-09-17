@@ -17,11 +17,9 @@ import {
   selectDbReady,
   selectIsLoading,
   selectToasts,
-  setDbReady,
   setSettings
 } from '../state/pageSlice';
 import { AppLayout } from './AppLayout';
-import { DatabaseChooser } from './DatabaseChooser/DatabaseChooser';
 
 export const App: FC = () => {
   const dbReady = useAppSelector(selectDbReady);
@@ -52,10 +50,11 @@ export const App: FC = () => {
     [dispatch]
   );
 
-  const onDatabaseRead = useCallback(() => {
-    dispatch(setDbReady(true));
-    getSettings();
-  }, [dispatch, getSettings]);
+  useEffect(() => {
+    if (dbReady) {
+      getSettings();
+    }
+  }, [dbReady, getSettings]);
 
   const handleConfirmLeave = useCallback(() => {
     confirmNavigation();
@@ -75,7 +74,7 @@ export const App: FC = () => {
 
   return (
     <>
-      {!dbReady && <DatabaseChooser onDatabaseRead={onDatabaseRead} />}
+      {!dbReady && <SpinnerOverlay />}
       {dbReady && (
         <BeforeUnloadProvider value={{ attemptNavigation, setBlocked }}>
           <AppLayout />

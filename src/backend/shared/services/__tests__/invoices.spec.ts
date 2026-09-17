@@ -19,7 +19,8 @@ const createTestDatabase = async (): Promise<DatabaseAdapter> => {
   const sqlite = new sqlite3.Database(':memory:');
   const db = createSqliteAdapter(sqlite);
   await initSchema(db);
-  await runMigrations(db, path.resolve(__dirname, '../../../../../dist-be/backend/migrations'));
+  const result = await runMigrations(db, path.resolve(__dirname, '../../../../../dist-be/backend/migrations'));
+  if (!result?.success) throw new Error('MIGRATION FAILED: ' + JSON.stringify(result));
   await initInitialData(db);
   return db;
 };

@@ -43,4 +43,9 @@ dist-fe
 dist-be
 dist-electron
 test-results
+playwright-report/
 data/e2e-*.sqlite
+data/users/
+scratch/
+test.cjs
+test.ts

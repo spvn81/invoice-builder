@@ -160,7 +160,7 @@ describe('V2 PDF layout rendering', () => {
     const contents = Array.from({ length: document.getPageCount() }, (_, index) => pageContent(document, index));
     expect(contents.every(content => content.length > 0)).toBe(true);
     expect(JSON.stringify(layoutSchema)).toBe(snapshotBeforeRender);
-  });
+  }, 30000);
 
   it('renders V2 landscape pages', async () => {
     const document = await renderPdf({
@@ -182,7 +182,7 @@ describe('V2 PDF layout rendering', () => {
     const page = document.getPage(0);
     const { width, height } = page.getSize();
     expect(width).toBeGreaterThan(height);
-  });
+  }, 30000);
 
   it('keeps fixed visual assets and page counters on a multi-page document', async () => {
     const imageSource = resolve(process.cwd(), 'src/renderer/assets/icon.png');

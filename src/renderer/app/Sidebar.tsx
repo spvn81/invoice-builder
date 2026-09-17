@@ -17,6 +17,7 @@ import CategoryIcon from '@mui/icons-material/Category';
 import ColorLensIcon from '@mui/icons-material/ColorLens';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import LogoutIcon from '@mui/icons-material/Logout';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import ScaleIcon from '@mui/icons-material/Scale';
 import ViewModule from '@mui/icons-material/ViewModule';
@@ -31,7 +32,7 @@ import { MenuList } from '../shared/components/lists/menuList/MenuList';
 import { Confirmation } from '../shared/components/modals/confirmation';
 import type { MenuItem } from '../shared/types/menuItem';
 import { useAppDispatch, useAppSelector } from '../state/configureStore';
-import { logout, selectSettings, selectVersion, setVersion } from '../state/pageSlice';
+import { logout, selectSettings, selectVersion, setVersion, setDbReady } from '../state/pageSlice';
 const DRAWER_WIDTH = 240;
 const COLLAPSED_WIDTH = 60;
 
@@ -89,6 +90,11 @@ export const Sidebar: FC = () => {
        window.location.href = '/home';
     }
   }, [dispatch]);
+
+  const handleSwitchWorkspace = useCallback(() => {
+    dispatch(setDbReady(false));
+    navigate('/select-database');
+  }, [dispatch, navigate]);
 
   const menuItems = [
     {
@@ -256,6 +262,14 @@ export const Sidebar: FC = () => {
           minHeight: 50,
           isSelected: isSelected,
           onClick: onClickNavigate
+        },
+        {
+          text: typeof window !== 'undefined' && !('electron' in window) ? 'Switch Workspace' : 'Switch Database',
+          icon: <SwapHorizIcon />,
+          isToggle: false,
+          minHeight: 50,
+          isSelected: () => false,
+          onClick: handleSwitchWorkspace
         },
         {
           text: t('menuItems.logout'),

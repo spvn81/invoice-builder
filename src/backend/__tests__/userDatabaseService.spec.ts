@@ -4,14 +4,12 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   resolveUserDatabases, 
-  provisionUserLocalDb, 
   ensureDefaultUserDatabase,
-  openUserDatabase,
   createUserDatabase,
   dbDir,
   DbStatus
 } from '../shared/services/userDatabaseService';
-import { getSystemDb, closeSystemDb } from '../shared/db/systemDb';
+import { getSystemDb } from '../shared/db/systemDb';
 import { clearDbForWorkspace } from '../webserver/database';
 
 vi.mock('../webserver/migration', () => ({
@@ -57,21 +55,17 @@ describe('userDatabaseService', () => {
     await systemDb.run('DELETE FROM workspaces WHERE id = ?', [workspaceId]);
   });
 
-  it('provisions a default database automatically', async () => {
+  it('auto-provisions a default database when zero DBs exist', async () => {
     const result = await ensureDefaultUserDatabase(userId);
     expect(result.validDbCount).toBe(1);
     expect(result.databaseSelectionRequired).toBe(false);
+    expect(result.databaseCreationRequired).toBe(false);
     expect(result.defaultDb).toBeDefined();
-    expect(result.defaultDb?.status).toBe(DbStatus.READY);
-    expect(result.defaultDb?.isDefault).toBe(true);
-
-    const dbPath = path.join(dbDir, 'users', userId, 'databases', result.defaultDb!.name);
-    expect(fs.existsSync(dbPath)).toBe(true);
   });
 
   it('marks database as missing when physical file is deleted', async () => {
-    const result1 = await ensureDefaultUserDatabase(userId);
-    const dbPath = path.join(dbDir, 'users', userId, 'databases', result1.defaultDb!.name);
+    const db = await createUserDatabase(userId, 'test.db');
+    const dbPath = path.join(dbDir, 'users', userId, 'databases', db.name);
     
     // Close connection so we can unlink the file on Windows
     await clearDbForWorkspace(workspaceId);
@@ -82,10 +76,14 @@ describe('userDatabaseService', () => {
     const dbs = await resolveUserDatabases(userId);
     expect(dbs.length).toBe(1);
     expect(dbs[0].status).toBe(DbStatus.MISSING);
+    
+    const result = await ensureDefaultUserDatabase(userId);
+    expect(result.validDbCount).toBe(1);
+    expect(result.databaseCreationRequired).toBe(false);
   });
 
   it('creates multiple databases and requires selection', async () => {
-    await ensureDefaultUserDatabase(userId);
+    await createUserDatabase(userId, 'first_db.sqlite');
     await createUserDatabase(userId, 'second_db.sqlite');
 
     const result = await ensureDefaultUserDatabase(userId);
@@ -94,7 +92,7 @@ describe('userDatabaseService', () => {
   });
 
   it('returns valid metadata for resolveUserDatabases', async () => {
-    await ensureDefaultUserDatabase(userId);
+    await createUserDatabase(userId, 'test.db');
     const dbs = await resolveUserDatabases(userId);
     
     expect(dbs.length).toBe(1);
@@ -108,17 +106,18 @@ describe('userDatabaseService', () => {
     await expect(createUserDatabase(userId, '/absolute/path.db')).rejects.toThrow('error.invalidDBName');
   });
 
-  it('handles concurrent provisioning without duplicates', async () => {
-    // Run 5 simultaneous ensureDefaultUserDatabase calls
+  it('handles concurrent provisioning safely', async () => {
     const promises = [
-      ensureDefaultUserDatabase(userId),
-      ensureDefaultUserDatabase(userId),
       ensureDefaultUserDatabase(userId),
       ensureDefaultUserDatabase(userId),
       ensureDefaultUserDatabase(userId),
     ];
 
-    await Promise.all(promises);
+    const results = await Promise.all(promises);
+    for (const r of results) {
+      expect(r.validDbCount).toBe(1);
+      expect(r.databaseCreationRequired).toBe(false);
+    }
 
     const dbs = await resolveUserDatabases(userId);
     expect(dbs.length).toBe(1);

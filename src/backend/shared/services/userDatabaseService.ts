@@ -72,11 +72,15 @@ export const ensureDefaultUserDatabase = async (userId: string) => {
     let validDbs = userDatabases.filter(db => db.status === DbStatus.READY);
 
     if (validDbs.length === 0) {
-      // 0 valid DBs: Provision one
       const newDb = await _provisionUserLocalDbInternal(userId, true, systemDb);
-      // reload
-      userDatabases = await _resolveUserDatabasesInternal(userId, systemDb);
-      validDbs = userDatabases.filter(db => db.status === DbStatus.READY);
+      await _openUserDatabaseInternal(userId, newDb.id, systemDb);
+      return {
+        validDbCount: 1,
+        databases: [newDb],
+        databaseSelectionRequired: false,
+        databaseCreationRequired: false,
+        defaultDb: newDb
+      };
     }
 
     if (validDbs.length === 1) {
@@ -87,6 +91,7 @@ export const ensureDefaultUserDatabase = async (userId: string) => {
         validDbCount: 1,
         databases: userDatabases,
         databaseSelectionRequired: false,
+        databaseCreationRequired: false,
         defaultDb: targetDb
       };
     }
@@ -94,7 +99,8 @@ export const ensureDefaultUserDatabase = async (userId: string) => {
     return {
       validDbCount: validDbs.length,
       databases: userDatabases,
-      databaseSelectionRequired: true
+      databaseSelectionRequired: true,
+      databaseCreationRequired: false
     };
   });
 };

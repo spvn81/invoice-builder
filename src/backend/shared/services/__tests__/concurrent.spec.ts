@@ -15,7 +15,10 @@ const createWorkspaceDb = async (workspaceId: string): Promise<DatabaseAdapter> 
   const sqlite = new sqlite3.Database(':memory:');
   const db = createSqliteAdapter(sqlite);
   await initSchema(db);
-  await runMigrations(db, path.resolve(__dirname, '../../../../../dist-be/backend/migrations'));
+  const result = await runMigrations(db, path.resolve(__dirname, '../../../../../dist-be/backend/migrations'));
+  if (!result?.success) {
+    console.error('MIGRATION FAILED:', result);
+  }
   await initInitialData(db);
   return db;
 };

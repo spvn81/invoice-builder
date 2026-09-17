@@ -3,10 +3,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
-import path from 'path';
 import { getSystemDb } from '../../shared/db/systemDb';
 import { APP_CONFIG } from '../config';
 import { sendEmail } from '../services/emailService';
+import { ensureUserWorkspace } from '../../shared/services/workspaceService';
 import { authMiddleware, type AuthRequest } from '../middlewares/authMiddleware';
 import { ensureDefaultUserDatabase } from '../../shared/services/userDatabaseService';
 
@@ -50,7 +50,7 @@ export const initAuthController = (app: Express) => {
 
       const passwordHash = await bcrypt.hash(password, 12);
       const userId = uuidv4();
-      
+
       const token = crypto.randomBytes(32).toString('hex');
       const tokenHash = await bcrypt.hash(token, 10);
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // Pass Date object for adapter compatibility
@@ -72,7 +72,7 @@ export const initAuthController = (app: Express) => {
       const appUrl = process.env.APP_URL || 'http://localhost:5173';
       const verifyLink = `${appUrl}/verify-email?token=${token}&email=${encodeURIComponent(email)}`;
       const emailHtml = `<p>Hello,</p><p>Please verify your email by clicking the link below:</p><p><a href="${verifyLink}">${verifyLink}</a></p>`;
-      
+
       console.log(`\n=========================================\n[DEV] Verification Link:\n${verifyLink}\nToken: ${token}\n=========================================\n`);
 
       try {
@@ -116,9 +116,11 @@ export const initAuthController = (app: Express) => {
       }
 
       // Verification successful!
+      console.log('[verify-email] verify token success. generating username');
       const username = await generateUsername(db);
       const workspaceId = uuidv4();
-
+      
+      console.log('[verify-email] updating user details in db');
       await db.run('BEGIN');
       try {
         await db.run('INSERT INTO workspaces (id, name) VALUES (?, ?)', [workspaceId, 'Default Workspace']);
@@ -126,20 +128,31 @@ export const initAuthController = (app: Express) => {
           username, workspaceId, user.id
         ]);
         await db.run('COMMIT');
+        console.log('[verify-email] updated user details in db successfully');
       } catch (err) {
         await db.run('ROLLBACK');
+        console.log('[verify-email] failed to update user details in db', err);
         throw err;
       }
 
-      // Initialize the database!
+      console.log('[verify-email] ensuring user workspace');
+      await ensureUserWorkspace(user.id);
+
+      console.log('[verify-email] ensuring default user database');
+      // ensureDefaultUserDatabase will automatically provision the default local workspace and SQLite DB.
       try {
-        await ensureDefaultUserDatabase(user.id);
-      } catch (err) {
-        console.error('Failed to setup local database during email verification. Will retry on login.', err);
+        const resolution = await ensureDefaultUserDatabase(user.id);
+        if (!resolution.databaseCreationRequired && !resolution.databaseSelectionRequired && resolution.validDbCount > 0) {
+          // Already has valid DBs, handled successfully by resolution
+        }
+      } catch (e) {
+        console.error('Failed to resolve DB during verification', e);
       }
 
+      console.log('[verify-email] returning success');
       res.json({ success: true, message: 'Email verified successfully', data: { username } });
     } catch (err) {
+      console.log('[verify-email] catch block error', err);
       res.status(500).json({ success: false, message: (err as Error).message });
     }
   });
@@ -148,8 +161,8 @@ export const initAuthController = (app: Express) => {
     try {
       const { email } = req.body;
       if (!email) {
-         res.status(400).json({ success: false, message: 'error.missingCredentials' });
-         return;
+        res.status(400).json({ success: false, message: 'error.missingCredentials' });
+        return;
       }
 
       const db = await getSystemDb();
@@ -159,7 +172,7 @@ export const initAuthController = (app: Express) => {
         res.json({ success: true, message: 'Verification email sent' });
         return;
       }
-      
+
       const user = userRes.rows[0] as any;
       const token = crypto.randomBytes(32).toString('hex');
       const tokenHash = await bcrypt.hash(token, 10);
@@ -170,7 +183,7 @@ export const initAuthController = (app: Express) => {
       const appUrl = process.env.APP_URL || 'http://localhost:5173';
       const verifyLink = `${appUrl}/verify-email?token=${token}&email=${encodeURIComponent(email)}`;
       const emailHtml = `<p>Hello,</p><p>Please verify your email by clicking the link below:</p><p><a href="${verifyLink}">${verifyLink}</a></p>`;
-      
+
       try {
         await sendEmail(email, 'Verify your email - Invoice Builder', emailHtml);
       } catch (e) {
@@ -210,11 +223,18 @@ export const initAuthController = (app: Express) => {
         return;
       }
 
+      // Ensure user has a valid workspace
+      await ensureUserWorkspace(user.id);
+
+      // Re-query user to get the potentially healed workspace_id
+      const healedUserRes = await db.query('SELECT * FROM users WHERE id = ?', [user.id]);
+      const healedUser = healedUserRes.rows[0] as any;
+
       // Reconcile and ensure valid DB setup
-      const dbResolution = await ensureDefaultUserDatabase(user.id);
+      const dbResolution = await ensureDefaultUserDatabase(healedUser.id);
 
       const token = jwt.sign(
-        { userId: user.id, workspaceId: user.default_workspace_id, username: user.username, email: user.email },
+        { userId: healedUser.id, workspaceId: healedUser.default_workspace_id, username: healedUser.username, email: healedUser.email },
         process.env.JWT_SECRET || APP_CONFIG.JWT_SECRET,
         { expiresIn: '7d' }
       );
@@ -226,16 +246,17 @@ export const initAuthController = (app: Express) => {
         maxAge: 7 * 24 * 60 * 60 * 1000
       });
 
-      res.json({ 
-        success: true, 
-        data: { 
-          userId: user.id, 
-          username: user.username, 
-          email: user.email, 
-          workspaceId: user.default_workspace_id,
+      res.json({
+        success: true,
+        data: {
+          userId: healedUser.id,
+          username: healedUser.username,
+          email: healedUser.email,
+          workspaceId: healedUser.default_workspace_id,
           databases: dbResolution.databases,
-          databaseSelectionRequired: dbResolution.databaseSelectionRequired
-        } 
+          databaseSelectionRequired: dbResolution.databaseSelectionRequired,
+          databaseCreationRequired: dbResolution.databaseCreationRequired
+        }
       });
     } catch (err) {
       res.status(500).json({ success: false, message: (err as Error).message });
@@ -251,6 +272,10 @@ export const initAuthController = (app: Express) => {
         return;
       }
       const user = userRes.rows[0] as any;
+
+      // Reconcile and ensure valid DB setup on session restore
+      const dbResolution = await ensureDefaultUserDatabase(user.id);
+
       res.json({
         success: true,
         data: {
@@ -259,7 +284,10 @@ export const initAuthController = (app: Express) => {
           username: user.username,
           emailVerified: user.email_verified === 1,
           status: user.status,
-          workspaceId: user.default_workspace_id
+          workspaceId: user.default_workspace_id,
+          databaseSelectionRequired: dbResolution.databaseSelectionRequired,
+          databaseCreationRequired: dbResolution.databaseCreationRequired,
+          validDbCount: dbResolution.validDbCount
         }
       });
     } catch (err) {
